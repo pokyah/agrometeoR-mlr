@@ -218,7 +218,7 @@ build.ps.locations.points_sf.fun <- function(sf.bool, EPSG.chr){
 build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, sf.bool, EPSG.chr = NULL){ #build.SRTM_terrain.90m.ras.fun
 
   # Get country geometry first
-  extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
+  extent.sp <- raster::getData('GADM', country=country_code.chr, level=1, path =  "./external-data/Boundaries")
 
   if(!is.null(NAME_1.chr)){
     extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
