@@ -77,16 +77,16 @@ get_from_agromet_API.fun <- function(
 
     # make each feature properties a list element
     date_ens.l <- results.df$properties
-    date_ens.l <- purrr::imap(date_ens.l, function(x, id) cbind(x, id))
+    date_ens.l <- purrr::imap(date_ens.l, function(x, sid) cbind(x, sid))
 
     coords.l <- results.df$geometry$coordinates
-    coords.l <- lapply(coords.l, as.data.frame(t))
-    coords.l <- purrr::imap(coords.l, function(x, id) cbind(x, id))
+    coords.l <- lapply(coords.l, function(x) as.data.frame(t(x)))
+    coords.l <- purrr::imap(coords.l, function(x, sid) cbind(x, sid))
 
     # join each feature coordinates + properties
     # https://stackoverflow.com/questions/44703738/merge-two-lists-of-dataframes
-    results.df <- purrr::map2_df(date_ens.l, coords.l, dplyr::left_join, by="id")
-    colnames(results.df) <- c("mhour", "ens", "id", "lat", "lon")
+    results.df <- purrr::map2_df(date_ens.l, coords.l, dplyr::left_join, by="sid")
+    colnames(results.df) <- c("mhour", "ens", "sid", "lat", "lon")
   }
 
   # check if we do not have results for this query, stop the execution
@@ -153,37 +153,43 @@ prepare_agromet_API_data.fun  <- function(meta_and_records.l, table_name.chr=NUL
   # In stations_meta.df, tmy_period information are stored as df stored inside df. We need to extract these from this inner level and add as new columns
   tmy_period.df <- stations_meta.df$metadata$tmy_period
 
-  stations_meta.df <- stations_meta.df %>% dplyr::select(-metadata)
-  stations_meta.df <- bind_cols(stations_meta.df, tmy_period.df)
-
-  # Transform from & to column to posix format for easier time handling
-  data.df <- stations_meta.df %>%
-    dplyr::mutate_at("from", as.POSIXct, format = "%Y-%m-%dT%H:%M:%S", tz = "GMT-2") %>%
-    dplyr::mutate_at("to", as.POSIXct, format = "%Y-%m-%dT%H:%M:%S", tz = "GMT-2")
+  if(table_name.chr != "get_rawdata_dssf"){
+    stations_meta.df <- stations_meta.df %>% dplyr::select(-metadata)
+    stations_meta.df <- bind_cols(stations_meta.df, tmy_period.df)
+    # Transform from & to column to posix format for easier time handling
+    data.df <- stations_meta.df %>%
+      dplyr::mutate_at("from", as.POSIXct, format = "%Y-%m-%dT%H:%M:%S", tz = "GMT-2") %>%
+      dplyr::mutate_at("to", as.POSIXct, format = "%Y-%m-%dT%H:%M:%S", tz = "GMT-2")
+  }else{
+    data.df <- NULL
+  }
 
   if(!is.null(records.df)){
     # Join stations_meta and records by "id"
-    data.df <- dplyr::left_join(data.df, records.df, by=c("sid"))
-
-    # Transform sid and id columns from character to numeric
-    data.df <- data.df %>% dplyr::mutate_at(c("sid"), dplyr::funs(as.numeric))
-
-    # Transform sensors.chr columns from character to numeric values
-    data.df <- data.df %>% dplyr::mutate_at(vars(one_of(sensors.chr)), dplyr::funs(as.numeric))
-
-    # Transform sunrise/sunset columns to times format for easier time handling
-    if(!is.null(data.df$sunrise)){
-      data.df <- data.df %>% dplyr::mutate_at(c("sunrise","sunset"), convertSun)
+    if(!is.null(data.df)){
+      records.df <- dplyr::left_join(data.df, records.df, by=c("sid"))
     }
 
+    # Transform sid and id columns from character to numeric
+    records.df <- records.df %>% dplyr::mutate_at(vars(one_of(c("sid", "id"))), dplyr::funs(as.numeric))
+
     # Transform mtime column to posix format for easier time handling
-    data.df <- data.df %>% dplyr::mutate_at("mtime", as.POSIXct, format = "%Y-%m-%dT%H:%M:%SZ")
+    records.df <- records.df %>% dplyr::mutate_at(vars(one_of(c("mtime", "mhour"))), as.POSIXct, format = "%Y-%m-%dT%H:%M:%SZ")
 
     # Transform meta altitude, longitude, latitude columns from character to numeric
-    data.df <- data.df %>% dplyr::mutate_at(vars(c("altitude", "longitude", "latitude")), dplyr::funs(as.numeric))
+    records.df <- records.df %>% dplyr::mutate_at(vars(one_of(c("altitude", "longitude", "latitude", "lon", "lat"))), dplyr::funs(as.numeric))
+
+    if(table_name.chr != "get_rawdata_dssf"){
+      # Transform sensors.chr columns from character to numeric values
+      records.df <- records.df %>% dplyr::mutate_at(vars(one_of(sensors.chr)), dplyr::funs(as.numeric))
+
+      # Transform sunrise/sunset columns to times format for easier time handling
+      if(!is.null(records.df$sunrise)){
+        records.df <- records.df %>% dplyr::mutate_at(c("sunrise","sunset"), convertSun)
+      }
+    }
   }
 
   # Return the properly typed and structured records dataframe.
-
-  return(data.df)
+  return(records.df)
 }
