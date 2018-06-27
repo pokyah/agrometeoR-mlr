@@ -164,7 +164,7 @@ build.ps.locations.points_sf.fun <- function(sf.bool, EPSG.chr){
       dfrom.chr = as.character(Sys.Date()-60),
       dto.chr = as.character(Sys.Date()-59),
       api_v.chr = "v2"
-    )
+    ), table_name.chr = "cleandata"
   )
 
   # Filtering records to keep only the useful ones (removing unecessary stations)
@@ -248,10 +248,10 @@ build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, s
 
   # append an id to each cell
   grid.sf$sid <- paste0(seq_along(1:nrow(data.frame(grid.sf))))
-  
+
   # select useful features
   grid.sf <- grid.sf %>% dplyr::select(ISO, NAME_0, NAME_1, sid, sf..st_make_grid.extent.sf..cellsize...res.num..n...c.500..500...)
-  
+
   # rename geometry column
   names(grid.sf)[names(grid.sf) == "sf..st_make_grid.extent.sf..cellsize...res.num..n...c.500..500..."] <- "geometry"
   sf::st_geometry(grid.sf) <- "geometry"
