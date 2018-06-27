@@ -39,7 +39,17 @@ build.lsa.hour.df <- function(lsa.json, hour.chr, grid.pt.sp) {
   }
   for(i in 1:length(lsa.coordinates.list)){
     for(j in 1:nrow(lsa.list[[i]])){
-      lsa.list[[i]][j, 'long'] <- lsa.coordinates.list[[i]][1]
+      lsa.litest_solar <- get_from_agromet_API.fun(
+  user_token.chr=Sys.getenv("AGROMET_API_V1_KEY"),
+  table_name.chr="get_rawdata_dssf",
+  sensors.chr=NULL,
+  stations_ids.chr=NULL,
+  dfrom.chr="2018-06-10",
+  dto.chr="2018-06-11",
+  month_day.chr=NULL,
+  api_v.chr="v2",
+  test.bool=FALSE
+)st[[i]][j, 'long'] <- lsa.coordinates.list[[i]][1]
       lsa.list[[i]][j, 'lat'] <- lsa.coordinates.list[[i]][2]
       lsa.list[[i]][j, 'sid'] <- paste0("st_",i)
     }
@@ -96,7 +106,17 @@ st_crs(lsa.20180611_14.sf) <- lambert2008.crs
 plot(lsa.20180611_14.sf)
 
 lsa.20180611_15.df <- get.hourly_lsa.wallonia.df(
-  lsa.json = lsa.json,
+  lsa.json =test_solar <- get_from_agromet_API.fun(
+  user_token.chr=Sys.getenv("AGROMET_API_V1_KEY"),
+  table_name.chr="get_rawdata_dssf",
+  sensors.chr=NULL,
+  stations_ids.chr=NULL,
+  dfrom.chr="2018-06-10",
+  dto.chr="2018-06-11",
+  month_day.chr=NULL,
+  api_v.chr="v2",
+  test.bool=FALSE
+) lsa.json,
   hour.chr = "2018-06-11 15:00:00",
   grid.pt.sp = grid.1000.pt.sp
 )
@@ -110,7 +130,17 @@ ps.locations.points_sf <- build.ps.locations.points_sf.fun(sf.bool = TRUE, EPSG.
 # https://www.neonscience.org/field-data-polygons-centroids
 # set the radius for the plots
 radius <- 500 # radius in meters
-# define the plot edges based upon the plot radius. 
+# define thetest_solar <- get_from_agromet_API.fun(
+  user_token.chr=Sys.getenv("AGROMET_API_V1_KEY"),
+  table_name.chr="get_rawdata_dssf",
+  sensors.chr=NULL,
+  stations_ids.chr=NULL,
+  dfrom.chr="2018-06-10",
+  dto.chr="2018-06-11",
+  month_day.chr=NULL,
+  api_v.chr="v2",
+  test.bool=FALSE
+) plot edges based upon the plot radius. 
 yPlus <- lsa.20180611_14.sf$northing+radius
 xPlus <- lsa.20180611_14.sf$easting+radius
 yMinus <- lsa.20180611_14.sf$northing-radius
@@ -138,4 +168,18 @@ proj4string=CRS(lambert2008.crs))
 
 
 ps.locations.ens.20180611_14.points_sf <- st_intersection(st_buffer(ps.locations.points_sf, dist = 500), lsa.20180611_14.sf)
+
+
+test_solar <- get_from_agromet_API.fun(
+  user_token.chr=Sys.getenv("AGROMET_API_V1_KEY"),
+  table_name.chr="get_rawdata_dssf",
+  sensors.chr=NULL,
+  stations_ids.chr=NULL,
+  dfrom.chr="2018-06-10",
+  dto.chr="2018-06-11",
+  month_day.chr=NULL,
+  api_v.chr="v2",
+  test.bool=FALSE
+)
+
 

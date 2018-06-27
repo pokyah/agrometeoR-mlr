@@ -50,6 +50,9 @@ get_from_agromet_API.fun <- function(
   if(table_name.chr=="get_tmy"){
     api_table_url.chr <- paste(baseURL.chr, api_v.chr, table_name.chr, sensors.chr, stations_ids.chr, month_day.chr, sep="/")
   }
+  if(table_name.chr=="get_rawdata_dssf"){
+    api_table_url.chr <- paste(baseURL.chr, api_v.chr, table_name.chr, dfrom.chr, dto.chr, "dailygeojson", sep="/")
+  }
   cat(paste("your API URL call is : ", api_table_url.chr, " \n "))
 
   # Add your user token into the HTTP authentication header and call API (https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization)
@@ -67,7 +70,24 @@ get_from_agromet_API.fun <- function(
   results.l <- jsonlite::fromJSON(api_results_json.chr)
 
   # Remove the terms of service and version info to only keep the data
-  results.df <- results.l$results
+  if(table_name.chr != "get_rawdata_dssf" ){
+    results.df <- results.l$results
+  }else{
+    results.df <- results.l$features
+
+    # make each feature properties a list element
+    date_ens.l <- results.df$properties
+    date_ens.l <- purrr::imap(date_ens.l, function(x, id) cbind(x, id))
+
+    coords.l <- results.df$geometry$coordinates
+    coords.l <- lapply(coords.l, as.data.frame(t))
+    coords.l <- purrr::imap(coords.l, function(x, id) cbind(x, id))
+
+    # join each feature coordinates + properties
+    # https://stackoverflow.com/questions/44703738/merge-two-lists-of-dataframes
+    results.df <- purrr::map2_df(date_ens.l, coords.l, dplyr::left_join, by="id")
+    colnames(results.df) <- c("mhour", "ens", "id", "lat", "lon")
+  }
 
   # check if we do not have results for this query, stop the execution
   if(class(results.df) != "data.frame"){
@@ -75,7 +95,7 @@ get_from_agromet_API.fun <- function(
   }
 
   # Rename the column "station" to "id" for later clarity of the code only if the API returns results
-  #colnames(results.df)[which(names(results.df) == "station")] <- "id"
+  # colnames(results.df)[which(names(results.df) == "station")] <- "id"
 
   # Create a dataframe for the stations meta-information
   stations_meta.df <- results.l$references$stations
