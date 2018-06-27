@@ -239,7 +239,7 @@ build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, s
   if(geom.chr=="polygons"){
     grid.sf <- grid.sf %>% dplyr::mutate(cell_area = sf::st_area(.))
   }
-  
+
 
   # transform to desired CRS
   if(!is.null(EPSG.chr)){
