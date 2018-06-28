@@ -24,20 +24,20 @@ library(gstat)
 #' @return a dataframe of spatialized solar irradiance for an hour
 #' @export
 build.lsa.hour.df <- function(lsa.records.df, hour.chr, grid.pt.sp) {
-  
+
   lsa.nested.df <- lsa.records.df %>%
     group_by(mhour) %>%
     tidyr::nest()
-  
+
   lsa.hour.df <- subset(lsa.nested.df, mhour == hour.chr)
-  
-  lsa.hour.sp <- lsa.hour.df$data[[1]]             
-  sp::coordinates(lsa.hour.sp) <- ~lat+lon    ########## err : inverse lat-lon ###########
+
+  lsa.hour.sp <- lsa.hour.df$data[[1]]
+  sp::coordinates(lsa.hour.sp) <- ~lon+lat
   # set crs lambert 2008
   raster::crs(lsa.hour.sp) <- "+proj=longlat +datum=WGS84 +no_defs"
   lsa.hour.sp <- sp::spTransform(lsa.hour.sp,
                              CRSobj ="+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
-  
+
   # interpolate surface with IDW method (inverse distance weighted)
   idw <- gstat::krige(formula = ens ~ 1, locations = lsa.hour.sp, newdata = grid.pt.sp)  # apply idw model for the data
   idw.output <- as.data.frame(idw) %>% # output is defined as a data table
