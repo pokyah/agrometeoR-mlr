@@ -47,8 +47,8 @@ library(reshape2)
 # Avoid interference with old variables by cleaning the Global Environment
 rm(list=ls(all=TRUE))
 
-load("./data/data_source.SRTM.terrain.wallonia.90m.ras.rda")
-load("./data/data_source.CLC.wallonia.polygons_sf.rda")
+# load("./data/data_source.SRTM.terrain.wallonia.90m.ras.rda")
+# load("./data/data_source.CLC.wallonia.polygons_sf.rda")
 source("./R/geo.R")
 source("./R/agromet_API.R")
 
@@ -98,16 +98,6 @@ grid.1000.pt.sf <- build.vs.grid.fun(
 )
 devtools::use_data(grid.1000.pt.sf, overwrite = TRUE)
 
-# Create the virtual stations interpolation grid polygons
-grid.1000.pg.sf <- build.vs.grid.fun(
-  res.num = 1000,
-  geom.chr = "polygons",
-  sf.bool = TRUE,
-  EPSG.chr = "3812",
-  country_code.chr = "BE",
-  NAME_1.chr = "Wallonie"
-)
-devtools::use_data(grid.1000.pg.sf, overwrite = TRUE)
 
 #####
 # COVER
