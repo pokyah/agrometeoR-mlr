@@ -11,38 +11,9 @@
 #'title: "R script to retrieve Agromet API data"
 #'date: Sys.Date()
 #'---
-
-
-
-# https://www.digitalocean.com/community/tutorials/how-to-install-java-with-apt-get-on-ubuntu-16-04
-
-#+ ---------------------------------
-#' ## Script preparation
-#' 
-#+ preparation, echo=FALSE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
-
-# Avoid interference with old variables by cleaning the Global Environment
-rm(list=ls(all=TRUE))
-
-# Automagically set the wd and the root of all projects 
-if (!require("here")) install.packages("here")
-library(here)
-wd.chr <- here::here()
-
-# loading the library to manage all the other libraries
-if (!require("pacman")) install.packages("pacman")
-library(pacman)
-requiredPackages <- read.csv("./settings/requiredPackages.csv", quote = "", sep = ",", header=TRUE, stringsAsFactors=FALSE)
-p_load(char=requiredPackages$packageName, character.only=TRUE )
-p_loaded()
-
-# Dynamic Sourcing of all the required functions
-source(paste0("../../pokyah/R-utilities/R-utilities.R"))
+source("./R/file_management.R")
 source_files_recursively.fun("./R")
-source_files_recursively.fun("../agrometeor_utilities_public/R/")
-
-# Loading the data
-#load(paste0(wd.chr,"/data-output/apicall.RData"))
+source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 
 #+ ---------------------------------
 #' ## Data acquisition
@@ -51,24 +22,26 @@ source_files_recursively.fun("../agrometeor_utilities_public/R/")
 
 #' ### Dependent variables
 
-# proj4
-proj4.chr <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+# static variables
+expl.static.grid.df
+
+
 
 # Retrieving from API
-tsa.records.df <- prepare_agromet_API_data.fun(
+dynamic.records.df <- prepare_agromet_API_data.fun(
   get_from_agromet_API.fun(
     user_token.chr = Sys.getenv("AGROMET_API_V1_KEY"),
     table_name.chr = "cleandata",
     stations_ids.chr = "all",
-    sensors.chr = "tsa",
-    dfrom.chr = as.character(Sys.Date()-60),
-    dto.chr = as.character(Sys.Date()-59),
+    sensors.chr = "tsa,ens",
+    dfrom.chr = "2018-06-11",
+    dto.chr = "2018-06-12",
     api_v.chr = "v2"
-  )
+  ), "cleandata"
 )
 
 # Filtering records to keep only the useful ones
-tsa.records.df <- tsa.records.df %>%
+dynamic.records.df <- dynamic.records.df %>%
   filter(network_name == "pameseb") %>%
   filter(type_name != "Sencrop") %>%
   filter(!is.na(to)) %>%
@@ -76,50 +49,8 @@ tsa.records.df <- tsa.records.df %>%
   filter(!is.na(tsa))
 
 # Selecting only the useful features
-tsa.records.df <- tsa.records.df %>%
-  dplyr::select(one_of(c("sid", "mtime", "longitude", "latitude", "altitude", "tsa")))
-
-# getting the interpolation grid and toporasterstack
-topo.ras <- build_topo_rasters.fun()
-topo.ras <- projectRaster(topo.ras, crs = proj4.chr)
-grid.sp <- build_wal_grid.sp.fun()
-#::todo::make sure we reproroject grid.sp"
-
-# core the topo rasters stack at the positions of the interpolation grid
-topo.grid.df <- data.frame(
-  raster::extract(
-    topo.ras,
-    grid.sp,
-    weights=TRUE,
-    fun=max
-  ))
-
-# group the topo info with the lon and lat info on the interpolation grid
-expl.grid.df <- bind_cols(data.frame(grid.sp), topo.grid.df)
-colnames(expl.grid.df) <- c("longitude", "latitude", "altitude", "pente", "orientation")
-
-# defining the stations locations sp object
-stations.sp <- tsa.records.df %>% 
-  dplyr::filter(mtime == min(mtime, na.rm = TRUE))
-coordinates(stations.sp) <- c("longitude", "latitude")
-crs(stations.sp) <- proj4.chr
-
-# core the topo rasters stack at the positions of the stations
-topo.stations.df <- data.frame(
-  raster::extract(
-    topo.ras,
-    stations.sp,
-    weights=TRUE,
-    fun=max
-  ))
-
-# join with the original tsa.records.df
-stations.df <- tsa.records.df %>%
-  group_by(mtime) %>%
-  mutate(altitude_topo = topo.stations.df$BEL_msk_alt) %>%
-  mutate(slope = topo.stations.df$slope) %>%
-  mutate(aspect = topo.stations.df$aspect) %>%
-  ungroup()
+dynamic.records.df <- dynamic.records.df %>%
+  dplyr::select(one_of(c("sid", "mtime", "longitude", "latitude", "altitude", "tsa" ,"ens")))
 
 #+ ---------------------------------
 #' ## mlr benchmark experiment preparation
@@ -147,7 +78,7 @@ resampling.l = mlr::makeResampleDesc(
 
 # Building a nested data frame, where for each hourly observation we have a 30 stations dataset of 1h temperature record.
 library(purrr)
-stations.nested.df <- stations.df %>%
+stations.nested.df <- dynamic.records.df %>%
   group_by(mtime) %>%
   tidyr::nest()
 
