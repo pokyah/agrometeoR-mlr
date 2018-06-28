@@ -67,27 +67,6 @@ build.SRTM.terrain.90m.ras.fun <- function(country_code.chr, NAME_1.chr=NULL, ag
 
   # inspired from https://www.gis-blog.com/download-srtm-for-an-entire-country/
   srtm_list  <- list()
-
-    # if(length(list.files(paste0(path.chr,"/Digital_Elevation_Model/90m_resolution/download"), all.files = TRUE, include.dirs = TRUE, no.. = TRUE))>0){
-    #   tile_files <- list.files(path.chr, pattern = "srtm")
-    #   unique(sort(list.files(path.chr, pattern = "tif")))
-    #   ## unique tile names
-    #   tile_names <- lapply(
-    #     strsplit((unique(list.files(paste0(path.chr, "/Digital_Elevation_Model/90m_resolution/download"), pattern = "tif"))), split = "\\."),
-    #     function(x) x[1]
-    #   )
-    #
-    #   ## unique extensions
-    #   extensions <- unique(sapply(
-    #     strsplit((unique(list.files(paste0(path.chr, "/Digital_Elevation_Model/90m_resolution/download"), pattern = "srtm"))), split = "\\."),
-    #     function(x) x[2]
-    #   ))
-    #
-    #   srtm_list <- lapply(
-    #     tile_names,
-    #     function(x) tile <- raster::raster(paste0(path.chr, "/Digital_Elevation_Model/90m_resolution/download", "/", x,".tif"))
-    #   )
-    #  }else{
       for(i in 1:length(tiles)){
         lon <- raster::extent(tiles[i,])[1]  + (raster::extent(tiles[i,])[2] - raster::extent(tiles[i,])[1]) / 2
         lat <- raster::extent(tiles[i,])[3]  + (raster::extent(tiles[i,])[4] - raster::extent(tiles[i,])[3]) / 2
@@ -100,7 +79,6 @@ build.SRTM.terrain.90m.ras.fun <- function(country_code.chr, NAME_1.chr=NULL, ag
                                 path = path.chr)
         srtm_list[[i]] <- tile
      }
-   #}
 
   # Mosaic tiles
   srtm_list$fun <- mean
@@ -240,7 +218,6 @@ build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, s
     grid.sf <- grid.sf %>% dplyr::mutate(cell_area = sf::st_area(.))
   }
 
-
   # transform to desired CRS
   if(!is.null(EPSG.chr)){
     grid.sf <- sf::st_transform(x = grid.sf, crs = as.numeric(EPSG.chr) )
@@ -263,60 +240,153 @@ build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, s
   }
 }
 
-#' Appends clc reclassified area percentage columns to a sf data frame
+#' Build a sf object containing reclassified CLC data
 #'
-#' Inspired from https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a and
-#' https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
-#' @param corine.wal.simple.sf A simple feature of land covers in Wallonia
-#' @param radius.num A numeric corresponding to the radius of the buffer that you want
-#' @param locations.sf A simple feature which has coordinates of points
-#' @return a sf data frame presenting percentage of cover of each land cover for each location
-append_clc_classes_buffer <- function(corine.wal.simple.sf, radius.num, locations.sf) {
+#' @author Thomas Goossens - pokyah.github.io
+#' @param country_code.chr a character specifying the ISO contrycode. Ex : BE for belgium
+#' @param NAME_1.chr a character specifying the NAME_1 value for lower than country level information
+#' @param EPSG.chr A character specifying the EPSG code of the desired Coordiante Reference System (CRS)
+#' @param EPSG.corine.chr A character specifying the EPSG code of the downloaded Corine Data
+#' @path.corine.shapefile.chr A character specifying the path where th corine shapefiles resides
+#' @return a sf data frame containing reclasssified corine land cover data
+build_cover.sf.fun <- function(
+  country_code.chr,
+  NAME_1.chr,
+  EPSG.chr,
+  path.corine.shapefile.chr,
+  EPSG.corine.chr){
 
-  # Make a buffer around locations
-  locations.buffer.sf <- sf::st_buffer(x = locations.sf, dist = radius.num, nQuadSegs = 8)
+  # Get country geometry first
+  extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
+  file.remove(list.files(pattern = "GADM_"))
+  crs <- crs(extent.sp)
 
-  # Cross-reference data to find the different land covers in the buffer
-  # http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-CLC2012-en.xml - CRS provided in the link
-  class.buffer.locations.sf <- sf::st_intersection(corine.wal.simple.sf, locations.buffer.sf)
-  class.buffer.locations.sf <- dplyr::mutate(class.buffer.locations.sf, customID = paste0("poly_",base::seq_along(1:nrow(class.buffer.locations.sf))))
+  if(!is.null(NAME_1.chr)){
+    extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
+  }
+  # reproject in the desired CRS
+  extent.sp <- sp::spTransform(extent.sp, sp::CRS(projargs = dplyr::filter(rgdal::make_EPSG(), code == EPSG.chr)$prj4))
 
-  # Verification
-  identical(nrow(class.buffer.locations.sf), length(unique(class.buffer.locations.sf$customID)))
+  # Download CORINE land cover for Belgium from http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
+  corine.sp <- maptools::readShapePoly(path.corine.shapefile.chr)
 
-  # Extract area of land covers in the buffer
+  # Define the CRS of corine land cover data
+  # We know the crs from the metadata provided on the website http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
+  raster::crs(corine.sp) <- as.character(dplyr::filter(rgdal::make_EPSG(), code == "3812")$prj4)
+
+  # Crop corine to extent
+  corine.extent.sp <- raster::crop(corine.sp, extent.sp)
+
+  # legend of corine
+  download.file("http://www.eea.europa.eu/data-and-maps/data/corine-land-cover-2006-raster-1/corine-land-cover-classes-and/clc_legend.csv/at_download/file",
+                destfile = "corine.legend.csv")
+  legend <- read.csv(file = "corine.legend.csv", header = TRUE, sep = ",")
+  file.remove("corine.legend.csv")
+
+  # Legend codes present in extent
+  legend.extent <- data.frame(unique(corine.extent.sp$code_12))
+
+  # https://stackoverflow.com/questions/38850629/subset-a-column-in-data-frame-based-on-another-data-frame-list
+  legend.extent <- subset(legend, CLC_CODE %in% legend.extent$unique.corine.extent.sp.code_12.)
+
+  # CLC_CODE class from integer to numeric
+  legend.extent$CLC_CODE <- as.numeric(legend.extent$CLC_CODE)
+
+  # from sp to sf
+  corine.extent.sf <- sf::st_as_sf(corine.extent.sp)
+  corine.extent.sf$code_12 <- as.numeric(paste(corine.extent.sf$code_12))
+
+  # Reclass Corine according to the following reclassification table
+  cover.sf <-
+    sf::st_as_sf(
+      dplyr::mutate(
+        corine.extent.sf,
+        CLASS = dplyr::case_when(
+          code_12 <= 142 ~ "Artificials surfaces",
+          code_12 == 211 ~ "Agricultural areas",
+          code_12 == 222 ~ "Agricultural areas",
+          code_12 == 231 ~ "Herbaceous vegetation",
+          code_12 == 242 ~ "Agricultural areas",
+          code_12 == 243 ~ "Agricultural areas",
+          code_12 == 311 ~ "Forest",
+          code_12 == 312 ~ "Forest",
+          code_12 == 313 ~ "Forest",
+          code_12 == 321 ~ "Herbaceous vegetation",
+          code_12 == 322 ~ "Herbaceous vegetation",
+          code_12 == 324 ~ "Forest",
+          code_12 > 400 ~ "Water"))
+    )
+}
+
+#' Get cover classes percentages for buffered points with custom radius
+#'
+#' @author Thomas Goossens - pokyah.github.io
+#' @param cover.sf a sf polygon of the land cover
+#' @param points a sf points of the locations on which surrounding cover needs to be summarized
+#' @param radius.num a numeric specifying the radius of the buffere th corine shapefiles resides
+#' @return a sf containing the %
+get.points.cover_pct.fun <- function(
+  cover.sf,
+  points.sf,
+  radius.num){
+
+  # transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
+  cover_2mlr.fun <- function(data.sf) {
+
+    # Delete geometry column
+    data.df <- data.frame(data.sf)
+
+    # Reshape data with CLASS labels as columns names
+    # https://stackoverflow.com/questions/39053451/using-spread-with-duplicate-identifiers-for-rows
+    data.df <- data.df %>%
+      dplyr::select(sid, CLASS, cover_rate) %>%
+      reshape2::dcast(sid ~ CLASS, fun = sum)
+
+    # https://stackoverflow.com/questions/5620885/how-does-one-reorder-columns-in-a-data-frame
+     return(data.df)
+  }
+
+  # reproject the cover in the same CRS as grid and physical stations
+  sf::st_transform(cover.sf, sf::st_crs(points.sf))
+
+  # Make a buffer around  points
   # https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
-  class.buffer.locations.sf.summary <- dplyr::group_by(class.buffer.locations.sf, customID) %>%
+  # https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
+  points.sf <- sf::st_buffer(x = points.sf, dist = radius.num)
+
+  # extract cover information into the buffered points
+  cover.points.sf <- sf::st_intersection(points.sf, cover.sf)
+  cover.points.sf <- cover.points.sf %>%
+    dplyr::mutate(
+      bid = paste0(seq_along(1:nrow(cover.points.sf))))
+
+  # create new column with area of each intersected cover polygon
+  cover.area.points.sf <- cover.points.sf %>%
+    dplyr:: group_by(bid) %>%
     dplyr::summarise() %>%
-    dplyr::mutate(common_area = sf::st_area(.))
+    mutate(shape.area = st_area(.))
 
-  # Make a column with percentage of occupation of each land cover
-  class.buffer.sf <- sf::st_join(x = class.buffer.locations.sf, y = class.buffer.locations.sf.summary, join = sf::st_covered_by) %>%
-    dplyr::select(sid, CLASS, common_area) %>%
-    dplyr::mutate(rate_cover = as.numeric(common_area/(pi*radius.num^2) * 100))
+  # Make a column with percentage of occupation of each land cover inside each grid point buffer
+  # https://github.com/r-spatial/sf/issues/239
+  cover_rate.points.sf <- sf::st_join(
+    x = cover.points.sf,
+    y = cover.area.points.sf,
+    join = sf::st_covered_by
+  ) %>%
+    dplyr::select(sid, CLASS, shape.area) %>%
+    dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*radius.num^2) * 100) #500 = buffer radius
 
-  return(class.buffer.sf)
-}
+  # transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
+  cover_rate.points.df <- cover_2mlr.fun(cover_rate.points.sf)
+  colnames(cover_rate.points.df) <- gsub(" ","_",colnames(cover_rate.points.df))
 
-#' It reshapes data::todo::
-#' @param class.buffers.sf A simple feature corresponding to buffers associated to their land covers with proportions
-#' @return a data frame with percentage of each land covers for each station
-convert_stations_clc_buffer <- function(class.buffers.sf = NULL) {
+  # merge cover data with points.1000.pt.sf
+  cover_rate.points.sf = merge(points.1000.pt.sf, cover_rate.points.df, by = "sid")
 
-  # Delete geometry column
-  class.buffers.df <- base::data.frame(class.buffers.sf)
-
-  # Reshape data with CLASS labels in columns names
-  # https://stackoverflow.com/questions/39053451/using-spread-with-duplicate-identifiers-for-rows
-  class.buffers.clean.df <- class.buffers.df %>%
-    dplyr::select(sid, CLASS, rate_cover) %>%
-    reshape2::dcast(sid ~ CLASS, fun = sum)
-
-  # https://stackoverflow.com/questions/5620885/how-does-one-reorder-columns-in-a-data-frame
-  class.buffers.clean.df <- class.buffers.clean.df[,c(1,2,5,4,3,6)]
-
-  return(class.buffers.clean.df)
-}
+  # only keep relevant columns
+  cover_rate.points.sf <- cover_rate.points.sf %>%
+    dplyr::select(1,15:19)
+ }
 
 #' Build a responsive leaflet map displaying agromet AWS network data
 #' @author Thomas Goossens - pokyah.github.io

@@ -47,31 +47,10 @@ library(reshape2)
 # Avoid interference with old variables by cleaning the Global Environment
 rm(list=ls(all=TRUE))
 
-load("./data/data_source.SRTM.terrain.wallonia.90m.ras.rda")
-load("./data/data_source.CLC.wallonia.polygons_sf.rda")
+# load("./data/data_source.SRTM.terrain.wallonia.90m.ras.rda")
+# load("./data/data_source.CLC.wallonia.polygons_sf.rda")
 source("./R/geo.R")
 source("./R/agromet_API.R")
-
-#####
-# FUNCTIONS DEFINITIONS
-#####
-
-cover_2mlr.fun <- function(data.sf) {
-
-  # Delete geometry column
-  data.df <- data.frame(data.sf)
-
-  # Reshape data with CLASS labels as columns names
-  # https://stackoverflow.com/questions/39053451/using-spread-with-duplicate-identifiers-for-rows
-  data.df <- data.df %>%
-    dplyr::select(sid, CLASS, cover_rate) %>%
-    reshape2::dcast(sid ~ CLASS, fun = sum)
-
-  # https://stackoverflow.com/questions/5620885/how-does-one-reorder-columns-in-a-data-frame
-  #data.df <- data.df[,c(1,2,5,4,3,6)]
-
-  return(data.df)
-}
 
 #####
 # DATA SOURCES
@@ -80,7 +59,6 @@ cover_2mlr.fun <- function(data.sf) {
 ##
 # TERRAIN
 ##
-
 terrain.90.ras <- build.SRTM.terrain.90m.ras.fun(
   country_code.chr = "BE",
   NAME_1.chr="Wallonie",
@@ -92,90 +70,13 @@ devtools::use_data(terrain.90.ras, overwrite = TRUE)
 ##
 # COVER
 ##
-
-build_cover.sf.fun <- function(
-  country_code.chr,
-  NAME_1.chr,
-  EPSG.chr,
-  path.boundaries.chr,
-  path.corine.shapefile.chr,
-  EPSG.corine.chr){
-  # Get country geometry first
-  if(length(list.files(path.boudnaries.chr, all.files = TRUE, include.dirs = TRUE, no.. = TRUE))>0){
-    extent.sp <- readRDS(paste0(path.boudnaries.chr, "GADM_2.8_BEL_adm1.rds"))
-  }else{
-    extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
-    crs <- crs(extant.sp)
-  }
-  if(!is.null(NAME_1.chr)){
-    extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
-  }
-  # reproject in the desired CRS
-  extent.sp <- sp::spTransform(extent.sp, sp::CRS(projargs = dplyr::filter(rgdal::make_EPSG(), code == EPSG.chr)$prj4))
-
-  # Download CORINE land cover for Belgium from http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
-  corine.sp <- maptools::readShapePoly(path.corine.shapefile.chr)
-
-  # Define the CRS of corine land cover data
-  # We know the crs from the metadata provided on the website http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
-  raster::crs(corine.sp) <- as.character(dplyr::filter(rgdal::make_EPSG(), code == "3812")$prj4)
-
-  # Crop corine to extent
-  corine.extent.sp <- raster::crop(corine.sp, extent.sp)
-
-  # legend of corine
-  download.file("http://www.eea.europa.eu/data-and-maps/data/corine-land-cover-2006-raster-1/corine-land-cover-classes-and/clc_legend.csv/at_download/file",
-                destfile = "corine.legend.csv")
-  legend <- read.csv(file = "corine.legend.csv", header = TRUE, sep = ",")
-  file.remove("corine.legend.csv")
-
-  # Legend codes present in extent
-  legend.extent <- data.frame(unique(corine.extent.sp$code_12))
-
-  # https://stackoverflow.com/questions/38850629/subset-a-column-in-data-frame-based-on-another-data-frame-list
-  legend.extent <- subset(legend, CLC_CODE %in% legend.extent$unique.corine.extent.sp.code_12.)
-
-  # CLC_CODE class from integer to numeric
-  legend.extent$CLC_CODE <- as.numeric(legend.extent$CLC_CODE)
-
-  # from sp to sf
-  corine.extent.sf <- sf::st_as_sf(corine.extent.sp)
-  corine.extent.sf$code_12 <- as.numeric(paste(corine.extent.sf$code_12))
-
-  # Reclass CLC according to reclassification table
-  cover.sf <-
-    sf::st_as_sf(
-      dplyr::mutate(
-        corine.wal.sf,
-        CLASS = dplyr::case_when(
-          code_12 <= 142 ~ "Artificials surfaces",
-          code_12 == 211 ~ "Agricultural areas",
-          code_12 == 222 ~ "Agricultural areas",
-          code_12 == 231 ~ "Herbaceous vegetation",
-          code_12 == 242 ~ "Agricultural areas",
-          code_12 == 243 ~ "Agricultural areas",
-          code_12 == 311 ~ "Forest",
-          code_12 == 312 ~ "Forest",
-          code_12 == 313 ~ "Forest",
-          code_12 == 321 ~ "Herbaceous vegetation",
-          code_12 == 322 ~ "Herbaceous vegetation",
-          code_12 == 324 ~ "Forest",
-          code_12 > 400 ~ "Water"))
-    )
-
-  }
-
-
-
-
-
+cover.sf <- build_cover.sf.fun(
+  country_code.chr= "BE",
+  NAME_1.chr = "Wallonie",
+  EPSG.chr = "3812",
+  path.corine.shapefile.chr = "./external-data/Corine_Land_Cover/CLC12_BE.shp",
+  EPSG.corine.chr = "3812")
 devtools::use_data(cover.sf, overwrite = TRUE)
-
-# renaming the datasource objects for code clarity
-# terrain.90.ras <- data_source.SRTM.terrain.wallonia.90m.ras
-# cover.sf <- data_source.clc_wallonia.polygons_sf
-#devtools::use_data(terrain.90.ras, overwrite = TRUE)
-#devtools::use_data(cover.sf, overwrite = TRUE)
 
 #####
 # EMPTY GRID + STATIONS
@@ -197,167 +98,26 @@ grid.1000.pt.sf <- build.vs.grid.fun(
 )
 devtools::use_data(grid.1000.pt.sf, overwrite = TRUE)
 
-# Create the virtual stations interpolation grid polygons
-grid.1000.pg.sf <- build.vs.grid.fun(
-  res.num = 1000,
-  geom.chr = "polygons",
-  sf.bool = TRUE,
-  EPSG.chr = "3812",
-  country_code.chr = "BE",
-  NAME_1.chr = "Wallonie"
-)
-devtools::use_data(grid.1000.pg.sf, overwrite = TRUE)
 
 #####
-# CORINE LAND COVER
+# COVER
 ##
 
 ##
 # COVER.GRID
 ##
-
-# reproject the cover in the same CRS as grid and physical stations
-sf::st_transform(cover.sf, sf::st_crs(grid.1000.pg.sf))
-devtools::use_data(cover.sf, overwrite = TRUE)
-
-# Make a 500m buffer around grid points
-# https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
-# https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
-buffered.grid.sf <- sf::st_buffer(x = grid.1000.pt.sf, dist = 500)
-devtools::use_data(buffered.grid.sf, overwrite = TRUE)
-
-# extract cover information into the buffered grid point
-cover.grid.sf <- sf::st_intersection(buffered.grid.sf, cover.sf) # reverted
-cover.grid.sf <- cover.grid.sf %>%
-  dplyr::mutate(
-    bid = paste0(seq_along(1:nrow(cover.grid.sf))))
-devtools::use_data(cover.grid.sf, overwrite = TRUE)
-
-# create new column with area of each intersected cover polygon
-cover.area.grid.sf <- cover.grid.sf %>%
-  dplyr:: group_by(bid) %>%
-  dplyr::summarise() %>%
-  mutate(shape.area = st_area(.))
-devtools::use_data(cover.area.grid.sf, overwrite = TRUE)
-
-# Make a column with percentage of occupation of each land cover inside each grid point buffer
-# https://github.com/r-spatial/sf/issues/239
-cover_rate.grid.sf <- sf::st_join(
-  x = cover.grid.sf,
-  y = cover.area.grid.sf,
-  join = sf::st_covered_by#sf::st_covered_by
-) %>%
-  dplyr::select(sid, CLASS, shape.area) %>%
-  dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*500^2) * 100) #500 = buffer radius
-devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
-# transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
-cover_rate.grid.df <- cover_2mlr.fun(cover_rate.grid.sf)
-colnames(cover_rate.grid.df) <- gsub(" ","_",colnames(cover_rate.grid.df))
-
-# merge cover data with grid.1000.pt.sf
-cover_rate.grid.sf = merge(grid.1000.pt.sf, cover_rate.grid.df, by = "sid")
-devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
-# only keep relevant columns
-cover_rate.grid.sf <- cover_rate.grid.sf %>%
-  dplyr::select(1,15:19)
-devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
-##########
-
-# # extracting the cover information for each polygon of the grid
-# cover.grid.sf <- sf::st_intersection(
-#   lwgeom::st_make_valid(
-#     cover.sf),
-#   grid.1000.pg.sf
-# )
-# devtools::use_data(cover.grid.sf, overwrite = TRUE)
-#
-# # create a new customID column and keep only useful columns with dplyr select
-# cover.grid.sf <- cover.grid.sf %>%
-#   dplyr::mutate(
-#     customID = paste0("poly_",
-#                     seq_along(1:nrow(cover.grid.sf))
-#     )
-#   ) %>%
-#   dplyr::select(ID, Area_ha, Shape_Leng, Shape_Area, CLASS, sid, customID, cell_area, geometry)
-# devtools::use_data(cover.grid.sf, overwrite = TRUE)
-#
-# # create new column with area of each cover polygon for every cell of the grid
-# cover.area.grid.sf <- cover.grid.sf %>%
-#   dplyr::group_by(customID) %>%
-#   dplyr::summarise() %>%
-#   dplyr::mutate(common_area = sf::st_area(.))
-# devtools::use_data(cover.area.grid.sf, overwrite = TRUE)
-#
-# # create new column with % area of each cover polygon for every cell of the grid
-# cover_rate.grid.sf <- sf::st_join(
-#   x = cover.grid.sf,
-#   y = cover.area.grid.sf,
-#   join = sf::st_covered_by) %>%
-#   dplyr::mutate(cover_rate = as.numeric(common_area/cell_area * 100)) %>%
-#   dplyr::select(sid, CLASS, common_area, cover_rate)
-# devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-#
-# cover_rate.grid.df <- cover_2mlr.fun(cover_rate.grid.sf)
-# colnames(cover_rate.grid.df) <- gsub(" ","_",colnames(cover_rate.grid.df))
-#
-# # as the terrain grid was built using the grid points instead of polygons,
-# # we need to intersect the grid polygons by points to have the same nrow for further joining
-#
-#
-# a.cover_rate.grid.sf <- st_intersection(grid.1000.pt.sf, cover_rate.grid.sf)
-# a.cover_rate.grid.sf  <- a.cover_rate.grid.sf  %>%
-#   dplyr::select(one_of(c("sid", )))
-#
-# # merge cover data with grid.1000.pg.sf
-# cover_rate.grid.sf = merge(grid.1000.pg.sf, cover_rate.grid.df, by = "sid")
-# devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
+cover_rate.grid.sf <- get.points.cover_pct.fun(
+  cover.sf = cover.sf ,
+  points.sf = grid.1000.pt.sf,
+  radius.num = 500)
 
 ##
 # COVER.STATIONS
 ##
-
-# Make a 100m buffer around stations
-# https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
-# https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
-buffered.stations.sf <- sf::st_buffer(x = stations.sf, dist = 100)
-devtools::use_data(buffer.stations.sf, overwrite = TRUE)
-
-# extract cover information into the buffered stations
-cover.stations.sf <- sf::st_intersection(cover.sf, buffered.stations.sf)
-cover.stations.sf <-cover.stations.sf %>%
-  dplyr::mutate(
-    bid = paste0(seq_along(1:nrow(cover.stations.sf))))
-devtools::use_data(cover.stations.sf, overwrite = TRUE)
-
-# create new column with area of each cover polygon for each buffered station
-cover.summary.stations.sf <- cover.stations.sf %>%
-  dplyr:: group_by(bid) %>%
-  dplyr::summarise() %>%
-  mutate(shape.area = st_area(.))
-devtools::use_data(cover.summary.stations.sf, overwrite = TRUE)
-
-# Make a column with percentage of occupation of each land cover inside the station buffer
-cover_rate.stations.sf <- sf::st_join(
-  x = cover.stations.sf,
-  y = cover.summary.stations.sf,
-  join = st_covered_by
-  ) %>%
-  dplyr::select(sid, CLASS, shape.area) %>%
-  dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*100^2) * 100)
-devtools::use_data(cover_rate.stations.sf, overwrite = TRUE)
-
-# transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
-cover_rate.stations.df <- cover_2mlr.fun(cover_rate.stations.sf)
-colnames(cover_rate.stations.df) <- gsub(" ","_",colnames(cover_rate.stations.df))
-
-# merge cover data with stations.sf
-cover_rate.stations.sf = merge(stations.sf, cover_rate.stations.df, by = "sid")
-devtools::use_data(cover_rate.stations.sf, overwrite = TRUE)
-
+cover_rate.stations.sf <- get.points.cover_pct.fun(
+  cover.sf = cover.sf ,
+  points.sf = stations.sf,
+  radius.num = 100)
 
 #####
 # TERRAIN
