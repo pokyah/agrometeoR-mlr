@@ -53,34 +53,12 @@ source("./R/geo.R")
 source("./R/agromet_API.R")
 
 #####
-# FUNCTIONS DEFINITIONS
-#####
-
-cover_2mlr.fun <- function(data.sf) {
-
-  # Delete geometry column
-  data.df <- data.frame(data.sf)
-
-  # Reshape data with CLASS labels as columns names
-  # https://stackoverflow.com/questions/39053451/using-spread-with-duplicate-identifiers-for-rows
-  data.df <- data.df %>%
-    dplyr::select(sid, CLASS, cover_rate) %>%
-    reshape2::dcast(sid ~ CLASS, fun = sum)
-
-  # https://stackoverflow.com/questions/5620885/how-does-one-reorder-columns-in-a-data-frame
-  #data.df <- data.df[,c(1,2,5,4,3,6)]
-
-  return(data.df)
-}
-
-#####
 # DATA SOURCES
 ##
 
 ##
 # TERRAIN
 ##
-
 terrain.90.ras <- build.SRTM.terrain.90m.ras.fun(
   country_code.chr = "BE",
   NAME_1.chr="Wallonie",
@@ -92,7 +70,6 @@ devtools::use_data(terrain.90.ras, overwrite = TRUE)
 ##
 # COVER
 ##
-
 cover.sf <- build_cover.sf.fun(
   country_code.chr= "BE",
   NAME_1.chr = "Wallonie",
@@ -100,12 +77,6 @@ cover.sf <- build_cover.sf.fun(
   path.corine.shapefile.chr = "./external-data/Corine_Land_Cover/CLC12_BE.shp",
   EPSG.corine.chr = "3812")
 devtools::use_data(cover.sf, overwrite = TRUE)
-
-# renaming the datasource objects for code clarity
-# terrain.90.ras <- data_source.SRTM.terrain.wallonia.90m.ras
-# cover.sf <- data_source.clc_wallonia.polygons_sf
-#devtools::use_data(terrain.90.ras, overwrite = TRUE)
-#devtools::use_data(cover.sf, overwrite = TRUE)
 
 #####
 # EMPTY GRID + STATIONS
@@ -139,104 +110,24 @@ grid.1000.pg.sf <- build.vs.grid.fun(
 devtools::use_data(grid.1000.pg.sf, overwrite = TRUE)
 
 #####
-# CORINE LAND COVER
+# COVER
 ##
 
 ##
 # COVER.GRID
 ##
-
-# reproject the cover in the same CRS as grid and physical stations
-sf::st_transform(cover.sf, sf::st_crs(grid.1000.pg.sf))
-devtools::use_data(cover.sf, overwrite = TRUE)
-
-# Make a 500m buffer around grid points
-# https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
-# https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
-buffered.grid.sf <- sf::st_buffer(x = grid.1000.pt.sf, dist = 500)
-devtools::use_data(buffered.grid.sf, overwrite = TRUE)
-
-# extract cover information into the buffered grid point
-cover.grid.sf <- sf::st_intersection(buffered.grid.sf, cover.sf) # reverted
-cover.grid.sf <- cover.grid.sf %>%
-  dplyr::mutate(
-    bid = paste0(seq_along(1:nrow(cover.grid.sf))))
-devtools::use_data(cover.grid.sf, overwrite = TRUE)
-
-# create new column with area of each intersected cover polygon
-cover.area.grid.sf <- cover.grid.sf %>%
-  dplyr:: group_by(bid) %>%
-  dplyr::summarise() %>%
-  mutate(shape.area = st_area(.))
-devtools::use_data(cover.area.grid.sf, overwrite = TRUE)
-
-# Make a column with percentage of occupation of each land cover inside each grid point buffer
-# https://github.com/r-spatial/sf/issues/239
-cover_rate.grid.sf <- sf::st_join(
-  x = cover.grid.sf,
-  y = cover.area.grid.sf,
-  join = sf::st_covered_by#sf::st_covered_by
-) %>%
-  dplyr::select(sid, CLASS, shape.area) %>%
-  dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*500^2) * 100) #500 = buffer radius
-devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
-# transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
-cover_rate.grid.df <- cover_2mlr.fun(cover_rate.grid.sf)
-colnames(cover_rate.grid.df) <- gsub(" ","_",colnames(cover_rate.grid.df))
-
-# merge cover data with grid.1000.pt.sf
-cover_rate.grid.sf = merge(grid.1000.pt.sf, cover_rate.grid.df, by = "sid")
-devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
-# only keep relevant columns
-cover_rate.grid.sf <- cover_rate.grid.sf %>%
-  dplyr::select(1,15:19)
-devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
+cover_rate.grid.sf <- get.points.cover_pct.fun(
+  cover.sf = cover.sf ,
+  points.sf = grid.1000.pt.sf,
+  radius.num = 500)
 
 ##
 # COVER.STATIONS
 ##
-
-# Make a 100m buffer around stations
-# https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
-# https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
-buffered.stations.sf <- sf::st_buffer(x = stations.sf, dist = 100)
-devtools::use_data(buffer.stations.sf, overwrite = TRUE)
-
-# extract cover information into the buffered stations
-cover.stations.sf <- sf::st_intersection(cover.sf, buffered.stations.sf)
-cover.stations.sf <-cover.stations.sf %>%
-  dplyr::mutate(
-    bid = paste0(seq_along(1:nrow(cover.stations.sf))))
-devtools::use_data(cover.stations.sf, overwrite = TRUE)
-
-# create new column with area of each cover polygon for each buffered station
-cover.summary.stations.sf <- cover.stations.sf %>%
-  dplyr:: group_by(bid) %>%
-  dplyr::summarise() %>%
-  mutate(shape.area = st_area(.))
-devtools::use_data(cover.summary.stations.sf, overwrite = TRUE)
-
-# Make a column with percentage of occupation of each land cover inside the station buffer
-cover_rate.stations.sf <- sf::st_join(
-  x = cover.stations.sf,
-  y = cover.summary.stations.sf,
-  join = st_covered_by
-  ) %>%
-  dplyr::select(sid, CLASS, shape.area) %>%
-  dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*100^2) * 100)
-devtools::use_data(cover_rate.stations.sf, overwrite = TRUE)
-
-# transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
-cover_rate.stations.df <- cover_2mlr.fun(cover_rate.stations.sf)
-colnames(cover_rate.stations.df) <- gsub(" ","_",colnames(cover_rate.stations.df))
-
-# merge cover data with stations.sf
-cover_rate.stations.sf = merge(stations.sf, cover_rate.stations.df, by = "sid")
-devtools::use_data(cover_rate.stations.sf, overwrite = TRUE)
-
+cover_rate.stations.sf <- get.points.cover_pct.fun(
+  cover.sf = cover.sf ,
+  points.sf = stations.sf,
+  radius.num = 100)
 
 #####
 # TERRAIN
