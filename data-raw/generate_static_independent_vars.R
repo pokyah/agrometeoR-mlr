@@ -321,7 +321,7 @@ devtools::use_data(terrain.stations.sf, overwrite = TRUE)
 
 expl.static.grid.sf <- terrain.grid.sf %>% sf::st_join(cover_rate.grid.sf)
 expl.static.grid.sf <- expl.static.grid.sf %>% dplyr::select(
-  one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "water", "geometry")))
+  one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "Water", "geometry")))
 colnames(expl.static.grid.sf) <- c("gid", "altitude", "slope", "aspect", "roughness","crops", "artificial", "forest", "herbaceous", "water", "geometry")
 devtools::use_data(expl.static.grid.sf, overwrite = TRUE)
 
