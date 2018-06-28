@@ -93,82 +93,12 @@ devtools::use_data(terrain.90.ras, overwrite = TRUE)
 # COVER
 ##
 
-build_cover.sf.fun <- function(
-  country_code.chr,
-  NAME_1.chr,
-  EPSG.chr,
-  path.boundaries.chr,
-  path.corine.shapefile.chr,
-  EPSG.corine.chr){
-  # Get country geometry first
-  if(length(list.files(path.boudnaries.chr, all.files = TRUE, include.dirs = TRUE, no.. = TRUE))>0){
-    extent.sp <- readRDS(paste0(path.boudnaries.chr, "GADM_2.8_BEL_adm1.rds"))
-  }else{
-    extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
-    crs <- crs(extant.sp)
-  }
-  if(!is.null(NAME_1.chr)){
-    extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
-  }
-  # reproject in the desired CRS
-  extent.sp <- sp::spTransform(extent.sp, sp::CRS(projargs = dplyr::filter(rgdal::make_EPSG(), code == EPSG.chr)$prj4))
-
-  # Download CORINE land cover for Belgium from http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
-  corine.sp <- maptools::readShapePoly(path.corine.shapefile.chr)
-
-  # Define the CRS of corine land cover data
-  # We know the crs from the metadata provided on the website http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
-  raster::crs(corine.sp) <- as.character(dplyr::filter(rgdal::make_EPSG(), code == "3812")$prj4)
-
-  # Crop corine to extent
-  corine.extent.sp <- raster::crop(corine.sp, extent.sp)
-
-  # legend of corine
-  download.file("http://www.eea.europa.eu/data-and-maps/data/corine-land-cover-2006-raster-1/corine-land-cover-classes-and/clc_legend.csv/at_download/file",
-                destfile = "corine.legend.csv")
-  legend <- read.csv(file = "corine.legend.csv", header = TRUE, sep = ",")
-  file.remove("corine.legend.csv")
-
-  # Legend codes present in extent
-  legend.extent <- data.frame(unique(corine.extent.sp$code_12))
-
-  # https://stackoverflow.com/questions/38850629/subset-a-column-in-data-frame-based-on-another-data-frame-list
-  legend.extent <- subset(legend, CLC_CODE %in% legend.extent$unique.corine.extent.sp.code_12.)
-
-  # CLC_CODE class from integer to numeric
-  legend.extent$CLC_CODE <- as.numeric(legend.extent$CLC_CODE)
-
-  # from sp to sf
-  corine.extent.sf <- sf::st_as_sf(corine.extent.sp)
-  corine.extent.sf$code_12 <- as.numeric(paste(corine.extent.sf$code_12))
-
-  # Reclass CLC according to reclassification table
-  cover.sf <-
-    sf::st_as_sf(
-      dplyr::mutate(
-        corine.wal.sf,
-        CLASS = dplyr::case_when(
-          code_12 <= 142 ~ "Artificials surfaces",
-          code_12 == 211 ~ "Agricultural areas",
-          code_12 == 222 ~ "Agricultural areas",
-          code_12 == 231 ~ "Herbaceous vegetation",
-          code_12 == 242 ~ "Agricultural areas",
-          code_12 == 243 ~ "Agricultural areas",
-          code_12 == 311 ~ "Forest",
-          code_12 == 312 ~ "Forest",
-          code_12 == 313 ~ "Forest",
-          code_12 == 321 ~ "Herbaceous vegetation",
-          code_12 == 322 ~ "Herbaceous vegetation",
-          code_12 == 324 ~ "Forest",
-          code_12 > 400 ~ "Water"))
-    )
-
-  }
-
-
-
-
-
+cover.sf <- build_cover.sf.fun(
+  country_code.chr= "BE",
+  NAME_1.chr = "Wallonie",
+  EPSG.chr = "3812",
+  path.corine.shapefile.chr = "./external-data/Corine_Land_Cover/CLC12_BE.shp",
+  EPSG.corine.chr = "3812")
 devtools::use_data(cover.sf, overwrite = TRUE)
 
 # renaming the datasource objects for code clarity
@@ -263,57 +193,6 @@ devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
 cover_rate.grid.sf <- cover_rate.grid.sf %>%
   dplyr::select(1,15:19)
 devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-
-##########
-
-# # extracting the cover information for each polygon of the grid
-# cover.grid.sf <- sf::st_intersection(
-#   lwgeom::st_make_valid(
-#     cover.sf),
-#   grid.1000.pg.sf
-# )
-# devtools::use_data(cover.grid.sf, overwrite = TRUE)
-#
-# # create a new customID column and keep only useful columns with dplyr select
-# cover.grid.sf <- cover.grid.sf %>%
-#   dplyr::mutate(
-#     customID = paste0("poly_",
-#                     seq_along(1:nrow(cover.grid.sf))
-#     )
-#   ) %>%
-#   dplyr::select(ID, Area_ha, Shape_Leng, Shape_Area, CLASS, sid, customID, cell_area, geometry)
-# devtools::use_data(cover.grid.sf, overwrite = TRUE)
-#
-# # create new column with area of each cover polygon for every cell of the grid
-# cover.area.grid.sf <- cover.grid.sf %>%
-#   dplyr::group_by(customID) %>%
-#   dplyr::summarise() %>%
-#   dplyr::mutate(common_area = sf::st_area(.))
-# devtools::use_data(cover.area.grid.sf, overwrite = TRUE)
-#
-# # create new column with % area of each cover polygon for every cell of the grid
-# cover_rate.grid.sf <- sf::st_join(
-#   x = cover.grid.sf,
-#   y = cover.area.grid.sf,
-#   join = sf::st_covered_by) %>%
-#   dplyr::mutate(cover_rate = as.numeric(common_area/cell_area * 100)) %>%
-#   dplyr::select(sid, CLASS, common_area, cover_rate)
-# devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
-#
-# cover_rate.grid.df <- cover_2mlr.fun(cover_rate.grid.sf)
-# colnames(cover_rate.grid.df) <- gsub(" ","_",colnames(cover_rate.grid.df))
-#
-# # as the terrain grid was built using the grid points instead of polygons,
-# # we need to intersect the grid polygons by points to have the same nrow for further joining
-#
-#
-# a.cover_rate.grid.sf <- st_intersection(grid.1000.pt.sf, cover_rate.grid.sf)
-# a.cover_rate.grid.sf  <- a.cover_rate.grid.sf  %>%
-#   dplyr::select(one_of(c("sid", )))
-#
-# # merge cover data with grid.1000.pg.sf
-# cover_rate.grid.sf = merge(grid.1000.pg.sf, cover_rate.grid.df, by = "sid")
-# devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
 
 
 ##
