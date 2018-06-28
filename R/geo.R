@@ -263,6 +263,84 @@ build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, s
   }
 }
 
+#' Build a sf object containing reclassified CLC data
+#'
+#' @author Thomas Goossens - pokyah.github.io
+#' @param country_code.chr a character specifying the ISO contrycode. Ex : BE for belgium
+#' @param NAME_1.chr a character specifying the NAME_1 value for lower than country level information
+#' @param EPSG.chr A character specifying the EPSG code of the desired Coordiante Reference System (CRS)
+#' @param EPSG.corine.chr A character specifying the EPSG code of the downloaded Corine Data
+#' @path.corine.shapefile.chr A character specifying the path where th corine shapefiles resides
+#' @return a sf data frame containing reclasssified corine land cover data
+build_cover.sf.fun <- function(
+  country_code.chr,
+  NAME_1.chr,
+  EPSG.chr,
+  path.corine.shapefile.chr,
+  EPSG.corine.chr){
+
+  # Get country geometry first
+  extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
+  file.remove(list.files(pattern = "GADM_"))
+  crs <- crs(extent.sp)
+
+  if(!is.null(NAME_1.chr)){
+    extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
+  }
+  # reproject in the desired CRS
+  extent.sp <- sp::spTransform(extent.sp, sp::CRS(projargs = dplyr::filter(rgdal::make_EPSG(), code == EPSG.chr)$prj4))
+
+  # Download CORINE land cover for Belgium from http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
+  corine.sp <- maptools::readShapePoly(path.corine.shapefile.chr)
+
+  # Define the CRS of corine land cover data
+  # We know the crs from the metadata provided on the website http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
+  raster::crs(corine.sp) <- as.character(dplyr::filter(rgdal::make_EPSG(), code == "3812")$prj4)
+
+  # Crop corine to extent
+  corine.extent.sp <- raster::crop(corine.sp, extent.sp)
+
+  # legend of corine
+  download.file("http://www.eea.europa.eu/data-and-maps/data/corine-land-cover-2006-raster-1/corine-land-cover-classes-and/clc_legend.csv/at_download/file",
+                destfile = "corine.legend.csv")
+  legend <- read.csv(file = "corine.legend.csv", header = TRUE, sep = ",")
+  file.remove("corine.legend.csv")
+
+  # Legend codes present in extent
+  legend.extent <- data.frame(unique(corine.extent.sp$code_12))
+
+  # https://stackoverflow.com/questions/38850629/subset-a-column-in-data-frame-based-on-another-data-frame-list
+  legend.extent <- subset(legend, CLC_CODE %in% legend.extent$unique.corine.extent.sp.code_12.)
+
+  # CLC_CODE class from integer to numeric
+  legend.extent$CLC_CODE <- as.numeric(legend.extent$CLC_CODE)
+
+  # from sp to sf
+  corine.extent.sf <- sf::st_as_sf(corine.extent.sp)
+  corine.extent.sf$code_12 <- as.numeric(paste(corine.extent.sf$code_12))
+
+  # Reclass Corine according to the following reclassification table
+  cover.sf <-
+    sf::st_as_sf(
+      dplyr::mutate(
+        corine.extent.sf,
+        CLASS = dplyr::case_when(
+          code_12 <= 142 ~ "Artificials surfaces",
+          code_12 == 211 ~ "Agricultural areas",
+          code_12 == 222 ~ "Agricultural areas",
+          code_12 == 231 ~ "Herbaceous vegetation",
+          code_12 == 242 ~ "Agricultural areas",
+          code_12 == 243 ~ "Agricultural areas",
+          code_12 == 311 ~ "Forest",
+          code_12 == 312 ~ "Forest",
+          code_12 == 313 ~ "Forest",
+          code_12 == 321 ~ "Herbaceous vegetation",
+          code_12 == 322 ~ "Herbaceous vegetation",
+          code_12 == 324 ~ "Forest",
+          code_12 > 400 ~ "Water"))
+    )
+}
+
 #' Appends clc reclassified area percentage columns to a sf data frame
 #'
 #' Inspired from https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a and
