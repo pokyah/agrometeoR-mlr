@@ -32,6 +32,7 @@
 # https://stackoverflow.com/questions/42927384/r-handling-of-sf-objects-in-raster-package
 # https://gis.stackexchange.com/questions/237133/function-sample-code-to-extract-raster-value-per-polygon-in-r
 
+install.packages("lwgeom")
 library(lwgeom)
 library(raster)
 library(sp)
@@ -79,8 +80,8 @@ cover_2mlr.fun <- function(data.sf) {
 # renaming the datasource objects for code clarity
 terrain.90.ras <- data_source.SRTM.terrain.wallonia.90m.ras
 cover.sf <- data_source.clc_wallonia.polygons_sf
-devtools::use_data(terrain.90.ras, overwrite = TRUE)
-devtools::use_data(cover.sf, overwrite = TRUE)
+#devtools::use_data(terrain.90.ras, overwrite = TRUE)
+#devtools::use_data(cover.sf, overwrite = TRUE)
 
 #####
 # EMPTY GRID + STATIONS
@@ -132,28 +133,28 @@ buffered.grid.sf <- sf::st_buffer(x = grid.1000.pt.sf, dist = 500)
 devtools::use_data(buffered.grid.sf, overwrite = TRUE)
 
 # extract cover information into the buffered grid point
-cover.grid.sf <- sf::st_intersection(cover.sf, buffered.grid.sf)
+cover.grid.sf <- sf::st_intersection(buffered.grid.sf, cover.sf) # reverted
 cover.grid.sf <- cover.grid.sf %>%
   dplyr::mutate(
-    customID = paste0(
-      "buffer_",seq_along(1:nrow(cover.grid.sf))))
+    bid = paste0(seq_along(1:nrow(cover.grid.sf))))
 devtools::use_data(cover.grid.sf, overwrite = TRUE)
 
-# create new column with area of each cover polygon for each buffered grid point
-cover.summary.grid.sf <- cover.grid.sf %>%
-  dplyr:: group_by(customID) %>%
+# create new column with area of each intersected cover polygon
+cover.area.grid.sf <- cover.grid.sf %>%
+  dplyr:: group_by(bid) %>%
   dplyr::summarise() %>%
-  mutate(common_area = st_area(.))
-devtools::use_data(cover.summary.grid.sf, overwrite = TRUE)
+  mutate(shape.area = st_area(.))
+devtools::use_data(cover.area.grid.sf, overwrite = TRUE)
 
 # Make a column with percentage of occupation of each land cover inside each grid point buffer
+# https://github.com/r-spatial/sf/issues/239
 cover_rate.grid.sf <- sf::st_join(
   x = cover.grid.sf,
-  y = cover.summary.grid.sf,
-  join = st_covered_by
+  y = cover.area.grid.sf,
+  join = sf::st_covered_by#sf::st_covered_by
 ) %>%
-  dplyr::select(sid, CLASS, common_area) %>%
-  dplyr::mutate(cover_rate = as.numeric(common_area/(pi*100^2) * 100))
+  dplyr::select(sid, CLASS, shape.area) %>%
+  dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*500^2) * 100) #500 = buffer radius
 devtools::use_data(cover_rate.grid.sf, overwrite = TRUE)
 
 # transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
@@ -235,15 +236,14 @@ devtools::use_data(buffer.stations.sf, overwrite = TRUE)
 cover.stations.sf <- sf::st_intersection(cover.sf, buffered.stations.sf)
 cover.stations.sf <-cover.stations.sf %>%
   dplyr::mutate(
-    customID = paste0(
-      "buffer_",seq_along(1:nrow(cover.stations.sf))))
+    bid = paste0(seq_along(1:nrow(cover.stations.sf))))
 devtools::use_data(cover.stations.sf, overwrite = TRUE)
 
 # create new column with area of each cover polygon for each buffered station
 cover.summary.stations.sf <- cover.stations.sf %>%
-  dplyr:: group_by(customID) %>%
+  dplyr:: group_by(bid) %>%
   dplyr::summarise() %>%
-  mutate(common_area = st_area(.))
+  mutate(shape.area = st_area(.))
 devtools::use_data(cover.summary.stations.sf, overwrite = TRUE)
 
 # Make a column with percentage of occupation of each land cover inside the station buffer
@@ -252,8 +252,8 @@ cover_rate.stations.sf <- sf::st_join(
   y = cover.summary.stations.sf,
   join = st_covered_by
   ) %>%
-  dplyr::select(sid, CLASS, common_area) %>%
-  dplyr::mutate(cover_rate = as.numeric(common_area/(pi*100^2) * 100))
+  dplyr::select(sid, CLASS, shape.area) %>%
+  dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*100^2) * 100)
 devtools::use_data(cover_rate.stations.sf, overwrite = TRUE)
 
 # transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
@@ -321,9 +321,8 @@ devtools::use_data(terrain.stations.sf, overwrite = TRUE)
 
 expl.static.grid.sf <- terrain.grid.sf %>% sf::st_join(cover_rate.grid.sf)
 expl.static.grid.sf <- expl.static.grid.sf %>% dplyr::select(
-  one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "geometry")))
-colnames(expl.static.grid.sf) <- c("gid", "altitude", "slope", "aspect", "roughness",
-                                   "crops", "artificial", "forest", "herbaceous", "geometry")
+  one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "water", "geometry")))
+colnames(expl.static.grid.sf) <- c("gid", "altitude", "slope", "aspect", "roughness","crops", "artificial", "forest", "herbaceous", "water", "geometry")
 devtools::use_data(expl.static.grid.sf, overwrite = TRUE)
 
 expl.static.grid.df <- dplyr::bind_cols(expl.static.grid.sf, data.frame(sf::st_coordinates(expl.static.grid.sf)))
