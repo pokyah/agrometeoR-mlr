@@ -47,7 +47,7 @@ build.lsa.hour.df <- function(lsa.records.df, hour.chr, grid.pt.sp) {
   return(idw.output)
 }
 
-
+# load solar irradiance data from API
 test_solar <- prepare_agromet_API_data.fun(get_from_agromet_API.fun(
   user_token.chr=Sys.getenv("AGROMET_API_V1_KEY"),
   table_name.chr="get_rawdata_dssf",
@@ -71,6 +71,7 @@ grid.1000.pt.sf <- build.vs.grid.fun(
 )
 grid.1000.pt.sp <- as(grid.1000.pt.sf, "Spatial")
 
+# get spatialized lsa data for one hour
 lsa.20180611_14.df <- build.lsa.hour.df(
   lsa.records.df = test_solar,
   hour.chr = "2018-06-11 14:00:00",
@@ -80,18 +81,19 @@ lsa.20180611_14.sf <- sf::st_as_sf(lsa.20180611_14.df, coords = c("long", "lat")
 lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
 st_crs(lsa.20180611_14.sf) <- lambert2008.crs
 
+# get spatialized lsa data for one other hour to valid they have the same number of points
 lsa.20180611_15.df <- build.lsa.hour.df(
   lsa.records.df = test_solar,
   hour.chr = "2018-06-11 15:00:00",
   grid.pt.sp = grid.1000.pt.sp
 )
 
-# virtual stations with their solar irradiance for an hour
+# get hourly solar irradiance for virtual stations (value for the centroid)
 vs.grid.ens.20180611_14.pt.sf <- st_join(grid.1000.pt.sf, lsa.20180611_14.sf)
 plot(vs.grid.ens.20180611_14.pt.sf[5])
 
 
-
+# Create the virtual stations interpolation grid polygons (1 km² cells)
 grid.1000.pg.sf <- build.vs.grid.fun(
   country_code.chr = "BE",
   NAME_1.chr = "Wallonie",
@@ -100,20 +102,19 @@ grid.1000.pg.sf <- build.vs.grid.fun(
   sf.bool = TRUE,
   EPSG.chr = 3812
 )
+
+# get hourly solar irradiance for virtual stations (same value for each coordinates in the polygon)
 vs.grid.ens.20180611_14.pg.sf <- sf::st_join(grid.1000.pg.sf, vs.grid.ens.20180611_14.pt.sf) %>%
   dplyr::select(ISO.x, NAME_0.x, NAME_1.x, sid.x, ens.pred, geometry)
+colnames(vs.grid.ens.20180611_14.pg.sf) <- c("ISO", "Country", "Region", "sid", "ens.pred", "geometry")
 plot(vs.grid.ens.20180611_14.pg.sf[5])
 
 # load physical stations locations
 ps.locations.points_sf <- build.ps.locations.points_sf.fun(sf.bool = TRUE, EPSG.chr = 3812)
 
-# get solar irradiance for each station
+# get solar irradiance for each physical station
 ps.locations.ens.20180611_14.pt_sf <- st_intersection(ps.locations.points_sf, vs.grid.ens.20180611_14.pg.sf) %>%
-  dplyr::select(sid, altitude, ISO.x, NAME_0.x, NAME_1.x, ens.pred, geometry)
+  dplyr::select(sid, altitude, ISO, Country, Region, ens.pred, geometry)
 plot(ps.locations.ens.20180611_14.pt_sf[6])
-
-
-
-
 
 
