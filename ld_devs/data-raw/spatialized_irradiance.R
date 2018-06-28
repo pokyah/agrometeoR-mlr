@@ -10,3 +10,5 @@ test_solar <- get_from_agromet_API.fun(
   test.bool=FALSE
 )
 
+
+t-prep <- prepare_agromet_API_data.fun(test_solar, "get_rawdata_dssf")
