@@ -319,6 +319,10 @@ devtools::use_data(terrain.stations.sf, overwrite = TRUE)
 # TERRAIN + COVER as DATAFRAME
 ##
 
+##
+#GRID
+##
+
 expl.static.grid.sf <- terrain.grid.sf %>% sf::st_join(cover_rate.grid.sf)
 expl.static.grid.sf <- expl.static.grid.sf %>% dplyr::select(
   one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "Water", "geometry")))
@@ -327,6 +331,18 @@ devtools::use_data(expl.static.grid.sf, overwrite = TRUE)
 
 expl.static.grid.df <- dplyr::bind_cols(expl.static.grid.sf, data.frame(sf::st_coordinates(expl.static.grid.sf)))
 devtools::use_data(expl.static.grid.df, overwrite = TRUE)
+
+##
+#STATIONS
+##
+expl.static.stations.sf <- terrain.stations.sf %>% sf::st_join(cover_rate.stations.sf)
+expl.static.stations.sf <- expl.static.stations.sf %>% dplyr::select(
+  one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "Water", "geometry")))
+colnames(expl.static.stations.sf) <- c("gid", "altitude", "slope", "aspect", "roughness","crops", "artificial", "forest", "herbaceous", "geometry")
+devtools::use_data(expl.static.stations.sf, overwrite = TRUE)
+
+expl.static.stations.df <- dplyr::bind_cols(expl.static.stations.sf, data.frame(sf::st_coordinates(expl.static.stations.sf)))
+devtools::use_data(expl.static.stations.df, overwrite = TRUE)
 
 #+ ---------------------------------
 #' ## Terms of service
