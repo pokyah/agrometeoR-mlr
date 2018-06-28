@@ -22,9 +22,9 @@ source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 
 #' ### Dependent variables
 
-# static variables
-expl.static.grid.df
-
+# static variables for stations
+load("./data/expl.static.grid.df.rda")
+load("./data/expl.static.grid.sf.rda")
 
 
 # Retrieving from API
@@ -46,16 +46,31 @@ dynamic.records.df <- dynamic.records.df %>%
   filter(type_name != "Sencrop") %>%
   filter(!is.na(to)) %>%
   filter(state == "Ok") %>%
-  filter(!is.na(tsa))
+  filter(!is.na(tsa)) %>%
+  filter(!is.na(ens))
 
 # Selecting only the useful features
 dynamic.records.df <- dynamic.records.df %>%
-  dplyr::select(one_of(c("sid", "mtime", "longitude", "latitude", "altitude", "tsa" ,"ens")))
+  dplyr::select("mtime", "sid", "tsa" ,"ens")
+colnames(dynamic.records.df) <- c("mtime", "gid", "tsa" ,"ens")
+
+# Building a nested data frame, where for each hourly observation we have a 30 stations dataset of 1h record.
+expl.stations.df <- left_join(expl.static.stations.df, dynamic.records.df, by = "gid")
+expl.stations.nested.df <- expl.stations.df[, c(13,1,2,3,4,5,6,7,8,9,14,15,11,12,10)] %>%
+  select(-geometry) %>%
+  group_by(mtime) %>%
+  nest() %>%
+  filter(mtime <= "2018-06-11 23:00:00" & mtime >= "2018-06-11 00:00:00")
+
 
 #+ ---------------------------------
 #' ## mlr benchmark experiment preparation
 #' 
 #+ data-acquisition, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
+
+
+bmr.l <- benchmark.hourly_sets(nested.records.df = expl.stations.nested.df, target.chr = "tsa")
+
 
 # defining the target var
 target.chr = "tsa"
@@ -76,15 +91,9 @@ resampling.l = mlr::makeResampleDesc(
   #predict = "test"
 )
 
-# Building a nested data frame, where for each hourly observation we have a 30 stations dataset of 1h temperature record.
-library(purrr)
-stations.nested.df <- dynamic.records.df %>%
-  group_by(mtime) %>%
-  tidyr::nest()
-
 # converting each tibble of the nested records to a strict dataframe (required by mlr)
 # ::todo:: need to use transmute_at
-stations.nested.df <- stations.nested.df %>%
+expl.stations.nested.df <- expl.stations.nested.df %>%
   mutate(data_as_df = purrr::map(
     .x = data,
     .f = data.frame
@@ -93,7 +102,7 @@ stations.nested.df <- stations.nested.df %>%
 # defining the regression tasks on the stations observations for each of the hourly datasets
 # https://stackoverflow.com/questions/46868706/failed-to-use-map2-with-mutate-with-purrr-and-dplyr
 # https://stackoverflow.com/questions/42518156/use-purrrmap-to-apply-multiple-arguments-to-a-function?rq=1
-stations.nested.df <- stations.nested.df %>%
+expl.stations.nested.df <- expl.stations.nested.df %>%
   mutate(all_vars.stations.task = purrr::map2(
     as.character(mtime),
     data_as_df,
@@ -102,10 +111,10 @@ stations.nested.df <- stations.nested.df %>%
   )
   )
 
-stations.nested.df <- stations.nested.df %>%
+expl.stations.nested.df <- expl.stations.nested.df %>%
   mutate(all_vars.stations.task2 = purrr::map2(
     all_vars.stations.task,
-    "sid",
+    "gid",
     mlr::dropFeatures
   ))
 
@@ -125,7 +134,7 @@ stations.nested.df <- stations.nested.df %>%
 
 bmr.l <- benchmark(
   learners = lrns.l,
-  tasks = stations.nested.df$all_vars.stations.task2,
+  tasks = expl.stations.nested.df$all_vars.stations.task2,
   resamplings = resampling.l,
   keep.pred = TRUE,
   show.info = TRUE
