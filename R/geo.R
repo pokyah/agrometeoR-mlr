@@ -67,27 +67,6 @@ build.SRTM.terrain.90m.ras.fun <- function(country_code.chr, NAME_1.chr=NULL, ag
 
   # inspired from https://www.gis-blog.com/download-srtm-for-an-entire-country/
   srtm_list  <- list()
-
-    # if(length(list.files(paste0(path.chr,"/Digital_Elevation_Model/90m_resolution/download"), all.files = TRUE, include.dirs = TRUE, no.. = TRUE))>0){
-    #   tile_files <- list.files(path.chr, pattern = "srtm")
-    #   unique(sort(list.files(path.chr, pattern = "tif")))
-    #   ## unique tile names
-    #   tile_names <- lapply(
-    #     strsplit((unique(list.files(paste0(path.chr, "/Digital_Elevation_Model/90m_resolution/download"), pattern = "tif"))), split = "\\."),
-    #     function(x) x[1]
-    #   )
-    #
-    #   ## unique extensions
-    #   extensions <- unique(sapply(
-    #     strsplit((unique(list.files(paste0(path.chr, "/Digital_Elevation_Model/90m_resolution/download"), pattern = "srtm"))), split = "\\."),
-    #     function(x) x[2]
-    #   ))
-    #
-    #   srtm_list <- lapply(
-    #     tile_names,
-    #     function(x) tile <- raster::raster(paste0(path.chr, "/Digital_Elevation_Model/90m_resolution/download", "/", x,".tif"))
-    #   )
-    #  }else{
       for(i in 1:length(tiles)){
         lon <- raster::extent(tiles[i,])[1]  + (raster::extent(tiles[i,])[2] - raster::extent(tiles[i,])[1]) / 2
         lat <- raster::extent(tiles[i,])[3]  + (raster::extent(tiles[i,])[4] - raster::extent(tiles[i,])[3]) / 2
@@ -100,7 +79,6 @@ build.SRTM.terrain.90m.ras.fun <- function(country_code.chr, NAME_1.chr=NULL, ag
                                 path = path.chr)
         srtm_list[[i]] <- tile
      }
-   #}
 
   # Mosaic tiles
   srtm_list$fun <- mean
@@ -240,7 +218,6 @@ build.vs.grid.fun <- function(country_code.chr, NAME_1.chr, res.num, geom.chr, s
     grid.sf <- grid.sf %>% dplyr::mutate(cell_area = sf::st_area(.))
   }
 
-
   # transform to desired CRS
   if(!is.null(EPSG.chr)){
     grid.sf <- sf::st_transform(x = grid.sf, crs = as.numeric(EPSG.chr) )
@@ -341,7 +318,75 @@ build_cover.sf.fun <- function(
     )
 }
 
+#' Get cover classes percentages for buffered points with custom radius
+#'
+#' @author Thomas Goossens - pokyah.github.io
+#' @param cover.sf a sf polygon of the land cover
+#' @param points a sf points of the locations on which surrounding cover needs to be summarized
+#' @param radius.num a numeric specifying the radius of the buffere th corine shapefiles resides
+#' @return a sf containing the %
+get.points.cover_pct.fun <- function(
+  cover.sf,
+  points.sf,
+  radius.num){
 
+  # transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
+  cover_2mlr.fun <- function(data.sf) {
+
+    # Delete geometry column
+    data.df <- data.frame(data.sf)
+
+    # Reshape data with CLASS labels as columns names
+    # https://stackoverflow.com/questions/39053451/using-spread-with-duplicate-identifiers-for-rows
+    data.df <- data.df %>%
+      dplyr::select(sid, CLASS, cover_rate) %>%
+      reshape2::dcast(sid ~ CLASS, fun = sum)
+
+    # https://stackoverflow.com/questions/5620885/how-does-one-reorder-columns-in-a-data-frame
+     return(data.df)
+  }
+
+  # reproject the cover in the same CRS as grid and physical stations
+  sf::st_transform(cover.sf, sf::st_crs(points.sf))
+
+  # Make a buffer around  points
+  # https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
+  # https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
+  points.sf <- sf::st_buffer(x = points.sf, dist = radius.num)
+
+  # extract cover information into the buffered points
+  cover.points.sf <- sf::st_intersection(points.sf, cover.sf)
+  cover.points.sf <- cover.points.sf %>%
+    dplyr::mutate(
+      bid = paste0(seq_along(1:nrow(cover.points.sf))))
+
+  # create new column with area of each intersected cover polygon
+  cover.area.points.sf <- cover.points.sf %>%
+    dplyr:: group_by(bid) %>%
+    dplyr::summarise() %>%
+    mutate(shape.area = st_area(.))
+
+  # Make a column with percentage of occupation of each land cover inside each grid point buffer
+  # https://github.com/r-spatial/sf/issues/239
+  cover_rate.points.sf <- sf::st_join(
+    x = cover.points.sf,
+    y = cover.area.points.sf,
+    join = sf::st_covered_by
+  ) %>%
+    dplyr::select(sid, CLASS, shape.area) %>%
+    dplyr::mutate(cover_rate = as.numeric(shape.area)/(pi*radius.num^2) * 100) #500 = buffer radius
+
+  # transposing to dataframe for data spreading (impossible (?) to achieve with dplyr spread)
+  cover_rate.points.df <- cover_2mlr.fun(cover_rate.points.sf)
+  colnames(cover_rate.points.df) <- gsub(" ","_",colnames(cover_rate.points.df))
+
+  # merge cover data with points.1000.pt.sf
+  cover_rate.points.sf = merge(points.1000.pt.sf, cover_rate.points.df, by = "sid")
+
+  # only keep relevant columns
+  cover_rate.points.sf <- cover_rate.points.sf %>%
+    dplyr::select(1,15:19)
+ }
 
 #' Build a responsive leaflet map displaying agromet AWS network data
 #' @author Thomas Goossens - pokyah.github.io
