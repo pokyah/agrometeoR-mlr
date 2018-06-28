@@ -5,6 +5,9 @@
 .Ruserdata
 
 external-data/**
-*.rda
 
-
+data/*
+!expl.static.stations.df.rda
+!expl.static.stations.sf.rda
+!expl.static.grid.df.rda
+!expl.static.grid.sf.rda
