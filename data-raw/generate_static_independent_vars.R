@@ -77,9 +77,103 @@ cover_2mlr.fun <- function(data.sf) {
 # DATA SOURCES
 ##
 
+##
+# TERRAIN
+##
+
+terrain.90.ras <- build.SRTM.terrain.90m.ras.fun(
+  country_code.chr = "BE",
+  NAME_1.chr="Wallonie",
+  aggregation_factor.num=NULL,
+  EPSG.chr="3812",
+  path.chr = "./external-data")
+devtools::use_data(terrain.90.ras, overwrite = TRUE)
+
+##
+# COVER
+##
+
+build_cover.sf.fun <- function(
+  country_code.chr,
+  NAME_1.chr,
+  EPSG.chr,
+  path.boundaries.chr,
+  path.corine.shapefile.chr,
+  EPSG.corine.chr){
+  # Get country geometry first
+  if(length(list.files(path.boudnaries.chr, all.files = TRUE, include.dirs = TRUE, no.. = TRUE))>0){
+    extent.sp <- readRDS(paste0(path.boudnaries.chr, "GADM_2.8_BEL_adm1.rds"))
+  }else{
+    extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
+    crs <- crs(extant.sp)
+  }
+  if(!is.null(NAME_1.chr)){
+    extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
+  }
+  # reproject in the desired CRS
+  extent.sp <- sp::spTransform(extent.sp, sp::CRS(projargs = dplyr::filter(rgdal::make_EPSG(), code == EPSG.chr)$prj4))
+
+  # Download CORINE land cover for Belgium from http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
+  corine.sp <- maptools::readShapePoly(path.corine.shapefile.chr)
+
+  # Define the CRS of corine land cover data
+  # We know the crs from the metadata provided on the website http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-en.xml
+  raster::crs(corine.sp) <- as.character(dplyr::filter(rgdal::make_EPSG(), code == "3812")$prj4)
+
+  # Crop corine to extent
+  corine.extent.sp <- raster::crop(corine.sp, extent.sp)
+
+  # legend of corine
+  download.file("http://www.eea.europa.eu/data-and-maps/data/corine-land-cover-2006-raster-1/corine-land-cover-classes-and/clc_legend.csv/at_download/file",
+                destfile = "corine.legend.csv")
+  legend <- read.csv(file = "corine.legend.csv", header = TRUE, sep = ",")
+  file.remove("corine.legend.csv")
+
+  # Legend codes present in extent
+  legend.extent <- data.frame(unique(corine.extent.sp$code_12))
+
+  # https://stackoverflow.com/questions/38850629/subset-a-column-in-data-frame-based-on-another-data-frame-list
+  legend.extent <- subset(legend, CLC_CODE %in% legend.extent$unique.corine.extent.sp.code_12.)
+
+  # CLC_CODE class from integer to numeric
+  legend.extent$CLC_CODE <- as.numeric(legend.extent$CLC_CODE)
+
+  # from sp to sf
+  corine.extent.sf <- sf::st_as_sf(corine.extent.sp)
+  corine.extent.sf$code_12 <- as.numeric(paste(corine.extent.sf$code_12))
+
+  # Reclass CLC according to reclassification table
+  cover.sf <-
+    sf::st_as_sf(
+      dplyr::mutate(
+        corine.wal.sf,
+        CLASS = dplyr::case_when(
+          code_12 <= 142 ~ "Artificials surfaces",
+          code_12 == 211 ~ "Agricultural areas",
+          code_12 == 222 ~ "Agricultural areas",
+          code_12 == 231 ~ "Herbaceous vegetation",
+          code_12 == 242 ~ "Agricultural areas",
+          code_12 == 243 ~ "Agricultural areas",
+          code_12 == 311 ~ "Forest",
+          code_12 == 312 ~ "Forest",
+          code_12 == 313 ~ "Forest",
+          code_12 == 321 ~ "Herbaceous vegetation",
+          code_12 == 322 ~ "Herbaceous vegetation",
+          code_12 == 324 ~ "Forest",
+          code_12 > 400 ~ "Water"))
+    )
+
+  }
+
+
+
+
+
+devtools::use_data(cover.sf, overwrite = TRUE)
+
 # renaming the datasource objects for code clarity
-terrain.90.ras <- data_source.SRTM.terrain.wallonia.90m.ras
-cover.sf <- data_source.clc_wallonia.polygons_sf
+# terrain.90.ras <- data_source.SRTM.terrain.wallonia.90m.ras
+# cover.sf <- data_source.clc_wallonia.polygons_sf
 #devtools::use_data(terrain.90.ras, overwrite = TRUE)
 #devtools::use_data(cover.sf, overwrite = TRUE)
 
