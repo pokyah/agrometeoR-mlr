@@ -341,60 +341,7 @@ build_cover.sf.fun <- function(
     )
 }
 
-#' Appends clc reclassified area percentage columns to a sf data frame
-#'
-#' Inspired from https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a and
-#' https://stackoverflow.com/questions/46704878/circle-around-a-geographic-point-with-st-buffer
-#' @param corine.wal.simple.sf A simple feature of land covers in Wallonia
-#' @param radius.num A numeric corresponding to the radius of the buffer that you want
-#' @param locations.sf A simple feature which has coordinates of points
-#' @return a sf data frame presenting percentage of cover of each land cover for each location
-append_clc_classes_buffer <- function(corine.wal.simple.sf, radius.num, locations.sf) {
 
-  # Make a buffer around locations
-  locations.buffer.sf <- sf::st_buffer(x = locations.sf, dist = radius.num, nQuadSegs = 8)
-
-  # Cross-reference data to find the different land covers in the buffer
-  # http://inspire.ngi.be/download-free/atomfeeds/AtomFeed-CLC2012-en.xml - CRS provided in the link
-  class.buffer.locations.sf <- sf::st_intersection(corine.wal.simple.sf, locations.buffer.sf)
-  class.buffer.locations.sf <- dplyr::mutate(class.buffer.locations.sf, customID = paste0("poly_",base::seq_along(1:nrow(class.buffer.locations.sf))))
-
-  # Verification
-  identical(nrow(class.buffer.locations.sf), length(unique(class.buffer.locations.sf$customID)))
-
-  # Extract area of land covers in the buffer
-  # https://gis.stackexchange.com/questions/229453/create-a-circle-of-defined-radius-around-a-point-and-then-find-the-overlapping-a
-  class.buffer.locations.sf.summary <- dplyr::group_by(class.buffer.locations.sf, customID) %>%
-    dplyr::summarise() %>%
-    dplyr::mutate(common_area = sf::st_area(.))
-
-  # Make a column with percentage of occupation of each land cover
-  class.buffer.sf <- sf::st_join(x = class.buffer.locations.sf, y = class.buffer.locations.sf.summary, join = sf::st_covered_by) %>%
-    dplyr::select(sid, CLASS, common_area) %>%
-    dplyr::mutate(rate_cover = as.numeric(common_area/(pi*radius.num^2) * 100))
-
-  return(class.buffer.sf)
-}
-
-#' It reshapes data::todo::
-#' @param class.buffers.sf A simple feature corresponding to buffers associated to their land covers with proportions
-#' @return a data frame with percentage of each land covers for each station
-convert_stations_clc_buffer <- function(class.buffers.sf = NULL) {
-
-  # Delete geometry column
-  class.buffers.df <- base::data.frame(class.buffers.sf)
-
-  # Reshape data with CLASS labels in columns names
-  # https://stackoverflow.com/questions/39053451/using-spread-with-duplicate-identifiers-for-rows
-  class.buffers.clean.df <- class.buffers.df %>%
-    dplyr::select(sid, CLASS, rate_cover) %>%
-    reshape2::dcast(sid ~ CLASS, fun = sum)
-
-  # https://stackoverflow.com/questions/5620885/how-does-one-reorder-columns-in-a-data-frame
-  class.buffers.clean.df <- class.buffers.clean.df[,c(1,2,5,4,3,6)]
-
-  return(class.buffers.clean.df)
-}
 
 #' Build a responsive leaflet map displaying agromet AWS network data
 #' @author Thomas Goossens - pokyah.github.io
