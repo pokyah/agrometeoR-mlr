@@ -133,7 +133,7 @@ devtools::use_data(buffered.grid.sf, overwrite = TRUE)
 
 # extract cover information into the buffered grid point
 cover.grid.sf <- sf::st_intersection(cover.sf, buffered.grid.sf)
-cover.grid.sf <-cover.grid.sf %>%
+cover.grid.sf <- cover.grid.sf %>%
   dplyr::mutate(
     customID = paste0(
       "buffer_",seq_along(1:nrow(cover.grid.sf))))
@@ -319,13 +319,15 @@ devtools::use_data(terrain.stations.sf, overwrite = TRUE)
 # TERRAIN + COVER as DATAFRAME
 ##
 
+expl.static.grid.sf <- terrain.grid.sf %>% sf::st_join(cover_rate.grid.sf)
+expl.static.grid.sf <- expl.static.grid.sf %>% dplyr::select(
+  one_of(c("sid.x", "layer", "slope", "aspect", "roughness", "Agricultural_areas", "Artificials_surfaces", "Forest", "Herbaceous_vegetation", "geometry")))
+colnames(expl.static.grid.sf) <- c("gid", "altitude", "slope", "aspect", "roughness",
+                                   "crops", "artificial", "forest", "herbaceous", "geometry")
+devtools::use_data(expl.static.grid.sf, overwrite = TRUE)
 
-nrow(terrain.stations.sf)
-nrow(cover_rate.stations.sf)
-
-nrow(terrain.grid.sf)
-nrow(cover_rate.grid.sf)
-
+expl.static.grid.df <- dplyr::bind_cols(expl.static.grid.sf, data.frame(sf::st_coordinates(expl.static.grid.sf)))
+devtools::use_data(expl.static.grid.df, overwrite = TRUE)
 
 #+ ---------------------------------
 #' ## Terms of service
