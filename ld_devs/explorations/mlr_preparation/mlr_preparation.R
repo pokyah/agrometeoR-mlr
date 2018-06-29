@@ -78,11 +78,11 @@ target.chr = "tsa"
 # defining the learners who will be compared
 lrns.l <- list(
   makeFilterWrapper(
-    learner = makeLearner(cl = "regr.lm", id="linear regression"),  fw.method = "information.gain", fw.abs = 2),
+    learner = makeLearner(cl = "regr.lm", id="linear regression"),  fw.method = "information.gain", fw.abs = 2)#,
   # makeLearner(cl = "regr.lm", id="linear regression"),
   # makeLearner(cl = "regr.elmNN", id="single layer neural net"),
   # makeLearner(cl ="regr.kknn", id="nearest neighbours"),
-  makeLearner(cl = "regr.km", id="kriging")
+  # makeLearner(cl = "regr.km", id="kriging")
 )
 
 # defining the validation (resampling) strategy
@@ -136,8 +136,9 @@ bmr.l <- benchmark(
   learners = lrns.l,
   tasks = expl.stations.nested.df$all_vars.stations.task2,
   resamplings = resampling.l,
-  keep.pred = TRUE,
-  show.info = TRUE
+  keep.pred = FALSE,
+  show.info = TRUE,
+  models = FALSE
 )
 
 #+ ---------------------------------
