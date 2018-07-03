@@ -1,6 +1,6 @@
 #'---
 #'author: "Thomas Goossens (CRA-W) - t.goossens@cra.wallonie.be"
-#'output: 
+#'output:
 #'  html_document:
 #'    theme: default
 #'    toc: false
@@ -17,15 +17,19 @@ source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 
 #+ ---------------------------------
 #' ## Data acquisition
-#' 
+#'
 #+ data-acquisition, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 #' ### Dependent variables
 
 # static variables for stations
-load("./data/expl.static.grid.df.rda")
-load("./data/expl.static.grid.sf.rda")
+load("./data/expl.static.stations.df.rda")
+#load("./data/expl.static.stations.sf.rda")
 
+# libraries
+library(mlr)
+library(tidyr)
+library(dplyr)
 
 # Retrieving from API
 dynamic.records.df <- prepare_agromet_API_data.fun(
@@ -54,18 +58,23 @@ dynamic.records.df <- dynamic.records.df %>%
   dplyr::select("mtime", "sid", "tsa" ,"ens")
 colnames(dynamic.records.df) <- c("mtime", "gid", "tsa" ,"ens")
 
-# Building a nested data frame, where for each hourly observation we have a 30 stations dataset of 1h record.
+# Building a nested data frame, where for each hourly observation we have a 27 stations dataset of 1h record.
 expl.stations.df <- left_join(expl.static.stations.df, dynamic.records.df, by = "gid")
-expl.stations.nested.df <- expl.stations.df[, c(13,1,2,3,4,5,6,7,8,9,14,15,11,12,10)] %>%
+
+# Reordering columns for better readability
+expl.stations.nested.df <- expl.stations.df[, c(13,1,2,3,4,5,6,7,8,9,14,15,11,12,10)]
+
+# Cleaning to only keep the explanatory vars and nesting for batch benchmark
+expl.stations.nested.df %>%
   select(-geometry) %>%
   group_by(mtime) %>%
-  nest() %>%
+  tidyr::nest() %>%
   filter(mtime <= "2018-06-11 23:00:00" & mtime >= "2018-06-11 00:00:00")
 
 
 #+ ---------------------------------
 #' ## mlr benchmark experiment preparation
-#' 
+#'
 #+ data-acquisition, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 
@@ -123,7 +132,7 @@ expl.stations.nested.df <- expl.stations.nested.df %>%
 
 #+ ---------------------------------
 #' ## mlr benchmarking
-#' 
+#'
 #+ benchmarking, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 # Now we can make a benchmark experiment as described in mlr package.
@@ -142,17 +151,17 @@ bmr.l <- benchmark(
 
 #+ ---------------------------------
 #' ## Defining the best method (i.e. combination of task + learner)
-#' 
+#'
 #+ best method, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 # mlr provides a function to access bmr performance aggregated or not. But in mlr the agreggation level is limited to each 30 stations hourly set.
-# => We need to compute the global mean of the performance measures 
+# => We need to compute the global mean of the performance measures
 perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
 
-global.methods.perfs <- perfs.methods.df %>% 
+global.methods.perfs <- perfs.methods.df %>%
   group_by(learner.id) %>%
   dplyr::summarise(global = mean(mse.test.mean))
-  
+
 # extracting the best learner from the bmr.l
 # ::todo:: combination of tsaks
 best.method <- getBMRLearners(bmr.l)[names(getBMRLearners(bmr.l)) == filter(global.methods.perfs, global == min(global))$learner.id]
@@ -162,7 +171,7 @@ resp.regr.lrn = class(getBMRLearners(bmr.l))[[1]] #extracting the first learner 
 
 #+ ---------------------------------
 #' ## Spatial prediction for one hour
-#' 
+#'
 #+ one_h_spatial_pred, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 # defining the regression prediction tasks on the interpolation grid for each of the hourly datasets
@@ -203,7 +212,7 @@ spatialized.df <- tsa.records.df %>%
     prediction_grid.df = explanatory.df
   )
 
-# making it a spatial object 
+# making it a spatial object
 # https://www.rdocumentation.org/packages/sp/versions/1.2-7/topics/SpatialGridDataFrame-class
 #https://stackoverflow.com/questions/29736577/how-to-convert-data-frame-to-spatial-coordinates#29736844
 gridded <- spatialized.df
@@ -216,14 +225,14 @@ gridded.3812.sp <- as(gridded.3812.sp, "SpatialGridDataFrame")
 
 #+ ---------------------------------
 #' ## mapping the predicted grid using tmap
-#' 
+#'
 #+ mapping, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 be.sp <- getData('GADM', country = 'BE', level = 1, download = TRUE)
 be.sp$NAME_1
 wallonie.sp <- be.sp[be.sp$NAME_1 == "Wallonie",]
 
-# check the CRS to know which map units are used  
+# check the CRS to know which map units are used
 proj4string(wallonie.sp)
 
 # set CRS to "lambert 2008" which EPSG is 3812
@@ -231,7 +240,7 @@ wallonie.3812.sp <- spTransform(wallonie.sp, CRS(projargs = dplyr::filter(rgdal:
 
 library(tmap)
 tm_shape(gridded.3812.sp, projection="3812") +
-  tm_raster("response",  
+  tm_raster("response",
             palette = "OrRd",
             title="Temperature",
             auto.palette.mapping=FALSE,
@@ -261,24 +270,24 @@ fitted_models.l  <- getBMRModels(tsa.bmr.l)
 
 #' # selecting features useful for modelization
 #' tsa.model.df <- tsa.records.df %>% select(one_of(c("longitude", "latitude", "altitude", "tsa")))
-#' 
+#'
 #' # converting to sf
-#' tsa.model.sf <- sf::st_as_sf(x = tsa.model.df, 
+#' tsa.model.sf <- sf::st_as_sf(x = tsa.model.df,
 #'                              coords = c("longitude", "latitude"),
 #'                              crs = 4326)
-#' 
+#'
 #' #+ ---------------------------------
 #' #' ## Spatialization
-#' #' 
+#' #'
 #' #+ spatialization, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
-#' 
+#'
 #' make_sf <- function(row){
 #'   st_as_sf(
-#'     x = row, 
+#'     x = row,
 #'     coords = c("longitude", "latitude"),
 #'     crs = 4326)
 #' }
-#' 
+#'
 #' #https://stackoverflow.com/questions/35558766/purrr-map-a-t-test-onto-a-split-df
 #' #http://stat545.com/block024_group-nest-split-map.html
 #' #https://purrr.tidyverse.org/reference/map.html
@@ -286,10 +295,10 @@ fitted_models.l  <- getBMRModels(tsa.bmr.l)
 #' #https://stackoverflow.com/questions/42518156/use-purrrmap-to-apply-multiple-arguments-to-a-function#42518473
 #' #https://stackoverflow.com/questions/49724457/how-to-pass-second-parameter-to-function-while-using-the-map-function-of-purrr-p
 #' #https://gis.stackexchange.com/questions/222978/lon-lat-to-simple-features-sfg-and-sfc-in-r
-#' 
-#' 
-#' 
-#' 
+#'
+#'
+#'
+#'
 #' #One model for each hour
 #' mod.by_mtime <- tsa.records.df %>%
 #'   group_by(mtime) %>%
@@ -301,15 +310,15 @@ fitted_models.l  <- getBMRModels(tsa.bmr.l)
 #'     target.chr = "tsa",
 #'     prediction_grid.df = vn_1_data.grid.df
 #'   ))
-#' 
-#' 
-#' 
-#' 
+#'
+#'
+#'
+#'
 #' mod.by_mtime.sf <-mod.by_mtime %>%
 #'   do(make_sf(
 #'     row =.
 #'   ))
-#' 
+#'
 #' bmr.by_mtime <- tsa.records.df %>%
 #'   group_by(mtime) %>%
 #'   do(lrns.benchmark(
@@ -318,8 +327,8 @@ fitted_models.l  <- getBMRModels(tsa.bmr.l)
 #'     target.chr = "tsa",
 #'     prediction_grid.df = vn_1_data.grid.df
 #'   ))
-#' 
-#' # 
+#'
+#' #
 #' se <- spatialize(
 #'   records.df = tsa.records.df,
 #'   task.id.chr = "t",
@@ -339,13 +348,13 @@ fitted_models.l  <- getBMRModels(tsa.bmr.l)
 
 
 #+ ---------------------------------
-#' ## Terms of service 
-#' To use the [AGROMET API](https://app.pameseb.be/fr/pages/api_call_test/) you need to provide your own user token.  
+#' ## Terms of service
+#' To use the [AGROMET API](https://app.pameseb.be/fr/pages/api_call_test/) you need to provide your own user token.
 #' The present script is available under the [GNU-GPL V3](https://www.gnu.org/licenses/gpl-3.0.en.html) license and comes with ABSOLUTELY NO WARRANTY.
-#' 
-#' Copyright : Thomas Goossens - t.goossens@cra.wallonie.be 2018.  
-#' 
-#' *(This document was generated using [R software](https://www.r-project.org/) with the [knitr library](https://deanattali.com/2015/03/24/knitrs-best-hidden-gem-spin/))*.  
-#+ TOS,echo=TRUE,warning=FALSE,message=FALSE,error=FALSE  
+#'
+#' Copyright : Thomas Goossens - t.goossens@cra.wallonie.be 2018.
+#'
+#' *(This document was generated using [R software](https://www.r-project.org/) with the [knitr library](https://deanattali.com/2015/03/24/knitrs-best-hidden-gem-spin/))*.
+#+ TOS,echo=TRUE,warning=FALSE,message=FALSE,error=FALSE
 
 
