@@ -28,9 +28,9 @@ spatialize <- function(records.df, task.id.chr, learner.id.chr, learner.cl.chr, 
   # creating the regression task
   regr.task = mlr::makeRegrTask(
     id = task.id.chr,
-    data = records.df[c("altitude", "tsa")],
+    data = data.frame(records.df$data[c("altitude", "tsa")]),
     target = target.chr,
-    coordinates = records.df[c("longitude", "latitude")]
+    coordinates = records.df$data[c("longitude", "latitude")]
   )
   
   # Get some information about the task
