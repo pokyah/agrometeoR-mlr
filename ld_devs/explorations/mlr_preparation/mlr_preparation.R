@@ -15,7 +15,7 @@ source("./R/file_management.R")
 source_files_recursively.fun("./R")
 source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 
-#install.packages('FSelector')
+# install.packages('FSelector')
 library(FSelector)
 library(tidyverse)
 library(sf)
@@ -34,7 +34,7 @@ library(mlr)
 # load("./data/expl.static.stations.sf.rda")
 load("./data/expl.static.stations.sf.rda")
 
-#### 1 day ####
+####  ####
 # Retrieving from API
 records.stations.df <- prepare_agromet_API_data.fun(
   get_from_agromet_API.fun(
@@ -156,10 +156,15 @@ bmr.l <- benchmark(
   models = FALSE,
   measures = list(mse, timetrain)
 )
+####  ####
 
-plotBMRBoxplots(bmr.l, measure = mse, style = "violin")
-plotBMRSummary(bmr.l)
-plotBMRRanksAsBarChart(bmr.l, pos = "dodge", order.lrn = getBMRLearnerIds(bmr.l))
+bmr.test <- make.benchmark_learners(dfrom.chr = "2018-04-01", dto.chr = "2018-05-30")
+perfs.methods.df <- getBMRAggrPerformances(bmr.test,as.df = TRUE)
+tsa.predict.df <- getBMRPredictions(bmr.test, as.df = TRUE)
+
+plotBMRBoxplots(bmr.test, measure = mse, style = "violin")
+plotBMRSummary(bmr.test)
+plotBMRRanksAsBarChart(bmr.test, pos = "dodge", order.lrn = getBMRLearnerIds(bmr.test))
 
 # qplot(mmce, colour = learner.id, facets = . ~ task.id,
 #       data = perfs.methods.30days.df[perfs.methods.30days.df$task.id %in% c("2018-05-11 12:00:00", "2018-05-11 13:00:00"),], geom = "density") +
@@ -176,17 +181,6 @@ plotBMRRanksAsBarChart(bmr.l, pos = "dodge", order.lrn = getBMRLearnerIds(bmr.l)
 perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
 
 global.methods.perfs <- perfs.methods.df %>%
-
-# => We need to compute the global mean of the performance measures
-perfs.methods.1day.df <- getBMRAggrPerformances(bmr.l.1day,as.df = TRUE)
-perfs.methods.7days.df <- getBMRAggrPerformances(bmr.l.7days,as.df = TRUE)
-perfs.methods.30days.df <- getBMRAggrPerformances(bmr.l.30days,as.df = TRUE)
-
-tsa.predict.1day <- getBMRPredictions(bmr.l.1day, as.df = TRUE)
-tsa.predict.7days <- getBMRPredictions(bmr.l.7days, as.df = TRUE)
-tsa.predict.30days <- getBMRPredictions(bmr.l.30days, as.df = TRUE)
-
-  global.methods.perfs <- perfs.methods.df %>%
   group_by(learner.id) %>%
   dplyr::summarise(global = mean(mse.test.mean))
 
@@ -195,7 +189,7 @@ tsa.predict.30days <- getBMRPredictions(bmr.l.30days, as.df = TRUE)
 best.method <- getBMRLearners(bmr.l)[names(getBMRLearners(bmr.l)) == filter(global.methods.perfs, global == min(global))$learner.id]
 
 # extracting one of the learner from the bmr expe
-resp.regr.lrn = class(getBMRLearners(bmr.l))[[1]] #extracting the first learner of the bmr experiment
+resp.regr.lrn = class(getBMRLearners(bmr.test))[[1]] #extracting the first learner of the bmr experiment
 
 #+ ---------------------------------
 #' ## Spatial prediction for one hour
@@ -203,25 +197,7 @@ resp.regr.lrn = class(getBMRLearners(bmr.l))[[1]] #extracting the first learner 
 #+ one_h_spatial_pred, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis'
 
 # defining the regression prediction tasks on the interpolation grid for each of the hourly datasets
-expl.stations.nested.1day.df <- expl.stations.nested.1day.df %>%
-  mutate(grid_task = purrr::map2(
-    as.character(mtime),
-    data_as_df,
-    mlr::makeRegrTask,
-    target = "tsa"
-  )
-  )
-
-expl.stations.nested.7days.df <- expl.stations.nested.7days.df %>%
-  mutate(grid_task = purrr::map2(
-    as.character(mtime),
-    data_as_df,
-    mlr::makeRegrTask,
-    target = "tsa"
-  )
-  )
-
-expl.stations.nested.30days.df <- expl.stations.nested.30days.df %>%
+data.stations.n.df <- data.stations.n.df %>%
   mutate(grid_task = purrr::map2(
     as.character(mtime),
     data_as_df,
@@ -236,25 +212,7 @@ se.regr.lrn = setPredictType(lrns.l, "se")
 
 
 # defining the models for each of the hourly datasets
-expl.stations.nested.1day.df <- expl.stations.nested.1day.df %>%
-  mutate(model = purrr::map2(
-    task,
-    train,
-    mlr::makeRegrTask,
-    target = target.chr
-  )
-  )
-
-expl.stations.nested.7days.df <- expl.stations.nested.7days.df %>%
-  mutate(model = purrr::map2(
-    task,
-    train,
-    mlr::makeRegrTask,
-    target = target.chr
-  )
-  )
-
-expl.stations.nested.30days.df <- expl.stations.nested.30days.df %>%
+data.stations.n.df <- data.stations.n.df %>%
   mutate(model = purrr::map2(
     task,
     train,
@@ -265,14 +223,14 @@ expl.stations.nested.30days.df <- expl.stations.nested.30days.df %>%
 
 # predicting
 
-spatialized.1day.df <- expl.stations.nested.1day.df %>%
+spatialized.df <- data.stations.n.df %>%
   spatialize(
     records.df  = .,
     task.id.chr = "t",
     learner.id.chr = "l",
     learner.cl.chr = "regr.lm",
     target.chr = "tsa",
-    prediction_grid.df = explanatory.df
+    prediction_grid.df = expl.static.stations.df
   )
 
 
