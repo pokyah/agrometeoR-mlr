@@ -16,6 +16,8 @@ source_files_recursively.fun("./R")
 source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 
 # install.packages('FSelector')
+# install.packages('elmNN')
+# install.packages('kknn')
 library(FSelector)
 library(tidyverse)
 library(sf)
