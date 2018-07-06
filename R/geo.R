@@ -47,7 +47,7 @@ build.SRTM.terrain.90m.ras.fun <- function(country_code.chr, NAME_1.chr=NULL, ag
     extent.sp <- readRDS(paste0(path.chr,"/Boundaries/", "GADM_2.8_BEL_adm1.rds"))
   }else{
     extent.sp <- raster::getData('GADM', country=country_code.chr, level=1)
-    crs <- crs(extant.sp)
+    crs <- crs(extent.sp)
   }
   if(!is.null(NAME_1.chr)){
     extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
