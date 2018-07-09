@@ -30,27 +30,44 @@ makeRLearner.regr.gstat = function(){#https://www.rdocumentation.org/packages/gs
     properties = c("numerics", "factors" , "se", "weights"),
     name = "Multivariable Geostatistical Prediction And Simulation",
     short.name = "gstat",
-    note = "https://www.rdocumentation.org/packages/gstat/versions/1.1-6/topics/gstat.
-I would recommend using the standard interface for gstat using krige. This combines the building of the gstat object and the prediction into one functions. Very rarely do you need to build gstat objects yourself
-https://stackoverflow.com/questions/13920342/how-to-make-ordinary-kriging-by-using-gstat-predict"
+    note = "To make the learner work, you cannot use the standard krige interface from gstat.\n
+            You must fisrt create a gstat object. The train function handles it for you.\n
+            More here : https://stackoverflow.com/questions/13920342/how-to-make-ordinary-kriging-by-using-gstat-predict.\n
+            The learner handles gstat variogram autofitting functionnality presented in this post https://www.r-spatial.org/r/2016/02/14/gstat-variogram-fitting.html.\n
+            Manual fitting : lrn.man = makeLearner(cl = 'regr.gstat', id= 'manual', model = list(psill=1, model='Sph', range=900, nugget=1), locations = ~x+y).\n
+            Automatic fitting : lrn.auto = makeLearner(cl = 'regr.gstat', id= 'auto', model = list(psill=c('Sph','Exp','Gau', 'Mat')), locations = ~x+y)"
   )
 }
 
 #' @export
-trainLearner.regr.gstat = function(.learner, .task, .subset, .weights = NULL,  ...) {
+trainLearner.regr.gstat = function(.learner, .task, .subset, .weights = NULL, model = NULL, ...) {
+#browser()
+  # data
   d = getTaskData(.task, .subset)
   #sp::coordinates(d) = ~x+y
+  # formula
   f <- getTaskFormula(.task, explicit.features = TRUE)
-  f <- paste(as.character(f)[ c(2,1,3)],collapse="")
-  f <- gsub("x + y + ", " ", f, fixed = TRUE) #regex more smart
-  browser()
-  f = as.formula(f)
-  #debug(gstat)
-  gstat::gstat(
-    formula = f,
-    data = d,
-    ...
-  )
+  # remove location vars as handled by gstat - https://stackoverflow.com/questions/40308944/removing-offset-terms-from-a-formula
+  f <- update(f, .~.-y-x)
+  if(!is.null(model)){
+    # variogram
+    v = variogram(object = f, locations = ~x+y, data =d)
+    fit <- gstat::fit.variogram(v, gstat::vgm(psill=model$psill, model=model$model, range=model$range, nugget = model$nugget))
+    # plot(v, fit)
+    # create the gstat object
+    g <- gstat::gstat(
+      formula = f,
+      data = d,
+      model = fit,
+      ...
+    )
+  }else{
+    g <- gstat::gstat(
+      formula = f,
+      data = d,
+      ...
+    )
+  }
 }
 
 #' @export #multivariate prediction https://www.rdocumentation.org/packages/gstat/versions/1.0-2/topics/predict.gstat
