@@ -1,10 +1,14 @@
-#' Spatialize solar irradiance for an hour and return its result in a dataframe
+#' Make tasks for the benchmark
 #' @author Loïc Davadan - ldavadan.github.io
-#' @param dfrom.chr A character which specifies the date from which you want to make a benchmark ; respect the format 'YYYY-MM-DD'
-#' @param dto.chr A character which specifies the date until which you want to make a benchmark ; respect the format 'YYYY-MM-DD'. Warning ! You will have only the result of midnight for this day
-#' @return a dataframe of spatialized solar irradiance for an hour
+#' @param static.vars A simple feature which contains static variables
+#' @param dynamic.vars A simple feature which contains records of dynamic variables
+#' @param target.chr A character which specifies the parameter you want to predict
+#' @param feat_to_drop.chr A character which specifies features you want not to be used like explanatory variables
+#' @param filter_method.chr A character to specify the method to use to filter features ; See listFilterMethods
+#' @param filter_abs.num A numeric which specifies how many top scoring features you want to select
+#' @return a nested dataframe with data and tasks for every hour
 #' @export
-make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr){
+make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_drop.chr, filter_method.chr, filter_abs.num){
   
   data.sf <- st_join(static.vars, dynamic.vars)
   
@@ -42,7 +46,90 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr){
       target = target.chr
     )
     )
+  
+  # drop unexplanatory features
+  data.stations.n.df <- data.stations.n.df %>%
+    mutate(filtered_tasks = map(
+      .x = tasks,
+      .f = mlr::dropFeatures,
+      features = feat_to_drop.chr
+      )
+    )
+  
+  # removing the tasks columns and only keeping the filtered tasks
+  data.stations.n.df <- data.stations.n.df %>%
+    dplyr::select(mtime, data_as_df, filtered_tasks)
+  
+  # Define tasks on the 25% best tasks only
+  data.stations.n.df$filtered_tasks <-  purrr::map(
+    data.stations.n.df$filtered_tasks,
+    mlr::filterFeatures,
+    method = filter_method.chr,
+    abs = filter_abs.num
+  )
+  
+  return(data.stations.n.df)
 }
 
+#' Prepare your data to be visualized with its related error on a map
+#' @author Loïc Davadan - ldavadan.github.io
+#' @param spatialized.tsa_error.sf A simple feature which contains temperature prediction on the grid and related error
+#' @param grid.pg.sf A simple feature made of polygons (squares), which forms the grid of Wallonia
+#' @param sf.bool A boolean which specifies if you want a sf (TRUE) or a sp (FALSE)
+#' @return a spatial object which contains a RGB value for each cell of the grid corresponding to its temperature prediction and its error
+#' @export
+build.spatialized.tsa_error.pg <- function(spatialized.tsa_error.sf, grid.pg.sf, sf.bool){
+  
+  ### Prepare spatialized data to be visualize with error on a map
+  # Set the visualization values:
+  resp.min <- min(spatialized.tsa_error.sf$response, na.rm=TRUE)  # resp.min - lower limit value;
+  resp.max <- max(spatialized.tsa_error.sf$response, na.rm=TRUE)  # resp.max - upper limit value;
+  se.min <- min(spatialized.tsa_error.sf$se, na.rm=TRUE)  # se.min - lower error value (0.4);
+  se.max <- max(spatialized.tsa_error.sf$se, na.rm=TRUE)  # se.max - upper error value (1.0);
 
-
+  # Strech the values (response) to the inspection range:
+  # Mask the values out of the 0-1 range:
+  spatialized.tsa_error.sf$norm.response <- (spatialized.tsa_error.sf$response-resp.min)/(resp.max-resp.min)
+  spatialized.tsa_error.sf$norm.response.centred <- ifelse(spatialized.tsa_error.sf$norm.response<=0, 0, ifelse(spatialized.tsa_error.sf$norm.response>1, 1, spatialized.tsa_error.sf$norm.response))
+  
+  # Derive the Hue image:
+  # The hues should lie between between 0 and 360, and the saturations
+  # and values should lie between 0 and 1.
+  spatialized.tsa_error.sf$tmpf1 <- -90-spatialized.tsa_error.sf$norm.response.centred*300
+  spatialized.tsa_error.sf$tmpf2 <- ifelse(spatialized.tsa_error.sf$tmpf1<=-360, spatialized.tsa_error.sf$tmpf1+360, spatialized.tsa_error.sf$tmpf1)
+  spatialized.tsa_error.sf$H <- ifelse(spatialized.tsa_error.sf$tmpf2>=0, spatialized.tsa_error.sf$tmpf2, (spatialized.tsa_error.sf$tmpf2+360))
+  
+  # Strech the error values (se) to the inspection range:
+  # Mask the values out of the 0-1 range:
+  spatialized.tsa_error.sf$norm.se <- (spatialized.tsa_error.sf$se-se.min)/(se.max-se.min)
+  spatialized.tsa_error.sf$norm.se.centred <- ifelse(spatialized.tsa_error.sf$norm.se<=0, 0, ifelse(spatialized.tsa_error.sf$norm.se>1, 1, spatialized.tsa_error.sf$norm.se))
+  
+  # Derive the saturation and intensity images:
+  spatialized.tsa_error.sf$S <- 1-spatialized.tsa_error.sf$norm.se.centred
+  spatialized.tsa_error.sf$V <- 0.5*(1+spatialized.tsa_error.sf$norm.se.centred)
+  
+  # Convert the HSV values to RGB :
+  library(colorspace)
+  RGBimg <- as(HSV(spatialized.tsa_error.sf$H, spatialized.tsa_error.sf$S, spatialized.tsa_error.sf$V), "RGB")
+  summary(RGBimg@coords)
+  # put them as R, G, B bands:
+  spatialized.tsa_error.sf$red <- RGBimg@coords[,1]
+  spatialized.tsa_error.sf$green <- RGBimg@coords[,2]
+  spatialized.tsa_error.sf$blue <- RGBimg@coords[,3]
+  summary(spatialized.tsa_error.sf[c("red", "green", "blue")])
+  spatialized.tsa_error.sf$RGB <- rgb(spatialized.tsa_error.sf$red, spatialized.tsa_error.sf$green, spatialized.tsa_error.sf$blue)
+  
+  # spatialize each cell according its RGB value
+  spatialized.tsa_error.pg.sf <- st_join(grid.pg.sf, spatialized.tsa_error.sf) %>%
+    dplyr::select(gid, response, se, norm.response.centred, norm.se.centred, RGB, geometry)
+  spatialized.tsa_error.pg.sf$RGB[is.na(spatialized.tsa_error.pg.sf$RGB)] <- "#ffffff"
+  
+  if(sf.bool == TRUE){
+    return(spatialized.tsa_error.pg.sf)
+  }else{
+    spatialized.tsa_error.pg.sp <- as(spatialized.tsa_error.pg.sf, "Spatial")
+    return(spatialized.tsa_error.pg.sp)
+  }
+  
+  
+}
