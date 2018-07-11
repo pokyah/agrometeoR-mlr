@@ -132,7 +132,7 @@ prepare_agromet_API_data.fun  <- function(meta_and_records.l, table_name.chr=NUL
   convertSun <- function(sunHour.chr){
 
     # transform to datetime format
-    sunHour.posix <- lubridate::strptime(x = sunHour.chr, format = "%H:%M:%S")
+    sunHour.posix <- strptime(x = sunHour.chr, format = "%H:%M:%S")
 
     # only keep the hour part using library chron
     sunHour.chron <- chron::times(format(sunHour.posix, "%H:%M:%S"))
