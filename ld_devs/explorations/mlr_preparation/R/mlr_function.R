@@ -99,6 +99,8 @@ build.spatialized.tsa_error.pg <- function(spatialized.tsa_error.sf, grid.pg.sf,
   spatialized.tsa_error.sf$tmpf2 <- ifelse(spatialized.tsa_error.sf$tmpf1<=-360, spatialized.tsa_error.sf$tmpf1+360, spatialized.tsa_error.sf$tmpf1)
   spatialized.tsa_error.sf$H <- ifelse(spatialized.tsa_error.sf$tmpf2>=0, spatialized.tsa_error.sf$tmpf2, (spatialized.tsa_error.sf$tmpf2+360))
   
+  # Modify Hue to match with the 'RdYlBu' palette colors from tmap
+  # inspired by https://stackoverflow.com/questions/20133344/find-closest-value-in-a-vector-with-binary-search
   library(data.table)
   H=c(3,14,30,44,192,195,203,214,237,347)
   list_H  <- data.table(H, val = H)
@@ -107,22 +109,13 @@ build.spatialized.tsa_error.pg <- function(spatialized.tsa_error.sf, grid.pg.sf,
   Hcorr <- data.frame(list_H[J(sp.H), roll = "nearest"])
   spatialized.tsa_error.sf$H <- Hcorr[,"val"]
   
-  # list_H = data.table(H = c(3,14,30,44,192,195,203,214,237,346),
-  #                     val = c(3,14,30,44,192,195,203,214,237,346)) # you'll see why val is needed in a sec
-  # setattr(list_H, "sorted", "H")  # let data.table know that w is sorted
-  # setkey(list_H, H) # sorts the data
-  
-  # binary search and "roll" to the nearest neighbour
-  # In the final expression the val column will have the you're looking for.
-  # list_H[J(your.number), roll = "nearest"]
-  
-  
   # Strech the error values (se) to the inspection range:
   # Mask the values out of the 0-1 range:
   spatialized.tsa_error.sf$norm.se <- (spatialized.tsa_error.sf$se-se.min)/(se.max-se.min)
   spatialized.tsa_error.sf$norm.se.centred <- ifelse(spatialized.tsa_error.sf$norm.se<=0, 0, ifelse(spatialized.tsa_error.sf$norm.se>1, 1, spatialized.tsa_error.sf$norm.se))
   
   # Derive the saturation and intensity images:
+  # Modifications to match with 'RdYlBu' palette colors
   spatialized.tsa_error.sf$S <- 1-spatialized.tsa_error.sf$norm.se.centred
   spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 3] <- 0.82*spatialized.tsa_error.sf$S#0.82-(1-spatialized.tsa_error.sf$S*0.82)
   spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 14] <- 0.73*spatialized.tsa_error.sf$S#0.73-(1-spatialized.tsa_error.sf$S*0.73)
@@ -133,19 +126,19 @@ build.spatialized.tsa_error.pg <- function(spatialized.tsa_error.sf, grid.pg.sf,
   spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 203] <- 0.43*spatialized.tsa_error.sf$S#0.43-(1-spatialized.tsa_error.sf$S*0.43)
   spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 214] <- 0.62*spatialized.tsa_error.sf$S#0.62-(1-spatialized.tsa_error.sf$S*0.62)
   spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 237] <- 0.67*spatialized.tsa_error.sf$S#0.67-(1-spatialized.tsa_error.sf$S*0.67)
-  spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 347] <- 1*spatialized.tsa_error.sf$S#1-(1-spatialized.tsa_error.sf$S*1)
+  # spatialized.tsa_error.sf$S[spatialized.tsa_error.sf$H == 347] <- 1*spatialized.tsa_error.sf$S#1-(1-spatialized.tsa_error.sf$S*1)
   
-  spatialized.tsa_error.sf$V <- 0.5*(1+spatialized.tsa_error.sf$norm.se.centred)
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 3] <- 0.84#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 14] <- 0.96#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 30] <- 0.96#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 44] <- 1#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 192] <- 0.97#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 195] <- 0.91#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 203] <- 0.82#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 214] <- 0.71#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 237] <- 0.58#*spatialized.tsa_error.sf$V
-  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 347] <- 0.65#*spatialized.tsa_error.sf$V
+  spatialized.tsa_error.sf$V <- 1
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 3] <- 0.84
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 14] <- 0.96
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 30] <- 0.96
+  # spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 44] <- 1
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 192] <- 0.97
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 195] <- 0.91
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 203] <- 0.82
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 214] <- 0.71
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 237] <- 0.58
+  spatialized.tsa_error.sf$V[spatialized.tsa_error.sf$H == 347] <- 0.65
   
   # Convert the HSV values to RGB :
   library(colorspace)

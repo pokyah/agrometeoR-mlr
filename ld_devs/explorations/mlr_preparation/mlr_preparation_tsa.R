@@ -109,7 +109,7 @@ data.stations.n.df <- data.stations.n.df %>%
 load("./data/expl.static.grid.df.rda")
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 02:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
@@ -131,18 +131,26 @@ spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_er
 # visualize the map
 # function needs a sf made of points if you do not want to visualize error
 # but needs a sf made of polygons if you want to
-map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.pg.sf,
+map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.sf,
                       method.chr = "lm",
                       date.chr = "2018-05-02 14:00:00",
                       type.chr = "interactive",
                       country_code.chr = "BE",
                       NAME_1.chr = "Wallonie",
-                      error.bool = TRUE,
-                      error_layer.bool = FALSE,
-                      alpha_error.num = NULL
+                      error.bool = FALSE,
+                      error_layer.bool = TRUE,
+                      alpha_error.num = 0.5
                       )
 map
 
+prediction_tsa.map <- make.map.tsa_prediction.fun(spatial.data.sf = spatialized.tsa_error.sf,
+                                                  type.chr = "static",
+                                                  method.chr = "lm",
+                                                  date.chr = "2018-05-02 14:00:00",
+                                                  country_code.chr = "BE",
+                                                  NAME_1.chr = "Wallonie",
+                                                  overlay.bool = FALSE)
+prediction_tsa.map
 
 ### Investigation clc
 
