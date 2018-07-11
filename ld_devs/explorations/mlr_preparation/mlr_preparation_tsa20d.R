@@ -12,9 +12,9 @@ records.stations.df <- prepare_agromet_API_data.fun(
     user_token.chr = Sys.getenv("AGROMET_API_V1_KEY"),
     table_name.chr = "cleandata",
     stations_ids.chr = "all",
-    sensors.chr = "tsa,ens,hra, hct",
+    sensors.chr = "tsa,ens,hra",
     dfrom.chr = "2018-05-01",
-    dto.chr = "2018-05-06",
+    dto.chr = "2018-05-21",
     api_v.chr = "v2"
   ), "cleandata"
 )
@@ -27,8 +27,7 @@ records.stations.df <- records.stations.df %>%
   filter(state == "Ok") %>%
   filter(!is.na(tsa)) %>%
   filter(!is.na(ens)) %>%
-  filter (!is.na(hra)) %>%
-  filter(!is.na(hct))
+  filter (!is.na(hra))
 
 
 load("./data/expl.static.stations.sf.rda")
@@ -38,7 +37,7 @@ expl.static.stations.sf <- expl.static.stations.sf %>%
 
 # Selecting only the useful features
 records.stations.df <- records.stations.df %>%
-  dplyr::select("mtime", "sid", "tsa" ,"ens", "hra", "hct", "longitude", "latitude")
+  dplyr::select("mtime", "sid", "tsa" ,"ens", "hra", "longitude", "latitude")
 colnames(records.stations.df)[2] <- "gid"
 
 # Preparing for spatial join of dynamic and static expl vars
@@ -51,7 +50,7 @@ records.stations.sf <- st_transform(records.stations.sf, crs = lambert2008.crs)
 data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf,
                                            dynamic.vars = records.stations.sf,
                                            target.chr = "tsa",
-                                           feat_to_drop.chr = c("hra", "hct"),
+                                           feat_to_drop.chr = "hra",
                                            filter_method.chr = "linear.correlation",
                                            filter_abs.num = 3)
 
@@ -88,7 +87,7 @@ bmr.l <- benchmark(
 
 # # computing performances of the benchmark
 # perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-# # mean mse.test.mean : 1.494918
+# # mean mse.test.mean : 1.751869
 # # predicting temperature
 # tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
@@ -109,7 +108,7 @@ data.stations.n.df <- data.stations.n.df %>%
 load("./data/expl.static.grid.df.rda")
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 15:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
@@ -131,15 +130,13 @@ spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_er
 # visualize the map
 # function needs a sf made of points if you do not want to visualize error
 # but needs a sf made of polygons if you want to
-map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.pg.sf,
+map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.sf,
                       method.chr = "lm",
-                      date.chr = "2018-05-02 14:00:00",
-                      type.chr = "interactive",
+                      date.chr = "2018-05-02 15:00:00",
+                      type.chr = "static",
                       country_code.chr = "BE",
                       NAME_1.chr = "Wallonie",
-                      error.bool = TRUE,
-                      error_layer.bool = FALSE,
-                      alpha_error.num = NULL
+                      error.bool = FALSE
                       )
 map
 

@@ -17,7 +17,9 @@ create_map_tsa <- function(
   type.chr,
   country_code.chr,
   NAME_1.chr,
-  error.bool){
+  error.bool,
+  error_layer.bool,
+  alpha_error.num = NULL){
   
   
   library(tmap)
@@ -33,16 +35,16 @@ create_map_tsa <- function(
     max_resp = round(max(spatial_data.sp@data$response, na.rm = TRUE), digits = 2)
     int_resp = round(((max_resp - min_resp)/10), digits = 2)
     # create a vector with legend breaks
-    legend_label = c(min_resp, "",
-                    min_resp + int_resp, "",
-                    min_resp + 2*int_resp, "",
-                    min_resp + 3*int_resp, "",
-                    min_resp + 4*int_resp, "",
-                    min_resp + 5*int_resp, "",
-                    min_resp + 6*int_resp, "",
-                    min_resp + 7*int_resp, "",
-                    min_resp + 8*int_resp, "",
-                    min_resp + 9*int_resp, "",
+    legend_label = c(min_resp,
+                    min_resp + int_resp,
+                    min_resp + 2*int_resp,
+                    min_resp + 3*int_resp,
+                    min_resp + 4*int_resp,
+                    min_resp + 5*int_resp,
+                    min_resp + 6*int_resp,
+                    min_resp + 7*int_resp,
+                    min_resp + 8*int_resp,
+                    min_resp + 9*int_resp,
                     max_resp)
 
     # file <- "./fig/craw.png"
@@ -55,15 +57,9 @@ create_map_tsa <- function(
       tm_fill(col = "RGB") +               # use RGB column of your data to fill grid cells
       tm_add_legend(type = "fill",         # legend which links colors to temperature (response)
                     labels = legend_label, 
-                    col = colorRampPalette(rev(brewer.pal(n=11, name='Spectral')))(21),
+                    col = colorRampPalette(rev(brewer.pal(n=11, name='RdYlBu')))(11),
                     title = "Temperature (°C)",
                     border.lwd = 0) +
-      # tm_shape(spatial_data.sp, is.master = TRUE) +
-      # tm_raster("se",
-      #           alpha = 0.5,
-      #           saturation = 0,
-      #           title = "Standard error",
-      #           breaks = c(0, 0.2, 0.4, 0.6, 0.7)) +
       tmap::tm_compass(position = c(0.9,0.15), color.light = "grey20") +      # north
       tmap::tm_scale_bar(breaks = NULL, width = NA, size = 0.8, text.color = "grey20",  # scale bar 
                    color.dark = "grey20", color.light = "white", lwd = 1, position = c(0.22,0.01),
@@ -81,10 +77,23 @@ create_map_tsa <- function(
                 frame.lwd = 0,
                 bg.color = "grey85",
                 main.title = base::paste("Interpolated temperature with ", method.chr, " - ", date.chr),
+                main.title.size = 0.9,
                 title = "Resolution : 1 km²", 
                 title.size = 0.6, 
                 title.position = c(0.01, 0.96)) +
       tmap::tm_credits("© CRA-W", position = c(.87, 0))
+    
+    if(error_layer.bool == TRUE){
+
+      spatial_error.sp <- spatial_data.sp
+      static <- static +
+        tm_shape(spatial_data.sp, is.master = TRUE) +
+        tm_raster("se",
+                  alpha = alpha_error.num,
+                  saturation = 0,
+                  title = "Standard error",
+                  breaks = c(0, 0.2, 0.4, 0.6, 0.7))
+    }
     
     if(type.chr == "static") {
       return(static)
@@ -121,7 +130,7 @@ create_map_tsa <- function(
     
     static <- tmap::tm_shape(spatial_data.sp, projection="3812")  +           # Projection : Belgian Lambert
         tmap::tm_raster("response",                                            # spatialize temperature
-                        palette = "-Spectral",
+                        palette = "-RdYlBu",
                         title = "Temperature (°C)",
                         auto.palette.mapping=FALSE,
                         breaks = c(stats::quantile(spatial_data.sp$response, 0, na.rm = TRUE),
@@ -152,16 +161,98 @@ create_map_tsa <- function(
                         frame.lwd = 0,
                         bg.color = "grey85",
                         main.title = base::paste("Interpolated temperature with ", method.chr, " - ", date.chr),
+                        main.title.size = 0.9,
                         title = "Resolution : 1 km²", 
                         title.size = 0.6, 
                         title.position = c(0.01, 0.96)) +
         tmap::tm_credits("© CRA-W", position = c(.87, 0))
     
-      if(type.chr == "static") {
-          return(static)
-        }else{
-            interactive <- tmap::tmap_leaflet(static)
-            return(interactive)
-          }
+    if(error_layer.bool == TRUE){
+      
+      spatial_error.sp <- spatial_data.sp
+      static <- static +
+        tm_shape(spatial_error.sp, is.master = TRUE) +
+        tm_raster("se",
+                  alpha = alpha_error.num,
+                  saturation = 0,
+                  title = "Standard error",
+                  breaks = c(0, 0.2, 0.4, 0.6, 0.7))
+    }
+    
+    if(type.chr == "static") {
+      return(static)
+      }else{
+        interactive <- tmap::tmap_leaflet(static)
+        return(interactive)
+      }
   }
 }
+
+
+create_map_tsa.comparison_clc <- 
+  function(spatial_data.sf,
+           clc.sf,
+           country_code.chr,
+           NAME_1.chr){
+    
+    
+    spatial_data.sp <- as(spatial_data.sf, "Spatial") %>%
+      as(., "SpatialPixelsDataFrame") %>%
+      as(., "SpatialGridDataFrame")
+    
+    # # define response minimum, response maximum, and response difference
+    # min_resp = round(min(spatial_data.sp@data$response, na.rm = TRUE), digits = 2)
+    # max_resp = round(max(spatial_data.sp@data$response, na.rm = TRUE), digits = 2)
+    # int_resp = round(((max_resp - min_resp)/10), digits = 2)
+    # # create a vector with legend breaks
+    # legend_label = c(min_resp, "",
+    #                  min_resp + int_resp, "",
+    #                  min_resp + 2*int_resp, "",
+    #                  min_resp + 3*int_resp, "",
+    #                  min_resp + 4*int_resp, "",
+    #                  min_resp + 5*int_resp, "",
+    #                  min_resp + 6*int_resp, "",
+    #                  min_resp + 7*int_resp, "",
+    #                  min_resp + 8*int_resp, "",
+    #                  min_resp + 9*int_resp, "",
+    #                  max_resp)
+    
+    # file <- "./fig/craw.png"
+    # choose boundaries to display
+    extent.sp <- raster::getData('GADM', country=country_code.chr, level=1, path = "./external-data/Boundaries")
+    extent.sp <- subset(extent.sp, NAME_1 == NAME_1.chr)
+    
+    # build the map
+    static <- tmap::tm_shape(spatial_data.sp, projection="3812") +            # Projection : Belgian Lambert
+      tm_raster(col = "se",
+                saturation = 0,
+                breaks = c(0, 0.2, 0.4, 0.6, 0.7)) +
+      tm_shape(clc.sf) +
+      tm_fill(col = "red", alpha = 0.2) +
+      tmap::tm_compass(position = c(0.9,0.15), color.light = "grey20") +      # north
+      tmap::tm_scale_bar(breaks = NULL, width = NA, size = 0.8, text.color = "grey20",  # scale bar 
+                         color.dark = "grey20", color.light = "white", lwd = 1, position = c(0.22,0.01),
+                         just = NA) +
+      # tmap::tm_logo(file, height = 2, halign = "center", margin = 0.2,        # CRA-W logo
+      #         position = c(-0.01,-0.04), just = NA) +
+      tmap::tm_shape(extent.sp) +                                      # boundaries
+      tmap::tm_borders("grey20", lwd = 1.5) +
+      tmap::tm_layout(legend.position = c(0.01,0.14),                         # parameters
+                      legend.height = 0.55,
+                      legend.text.size = 0.7,
+                      legend.bg.color = "white",
+                      legend.title.size = 0.9,
+                      inner.margins = c(0.03, 0.03, 0.07, 0.03),
+                      frame.lwd = 0,
+                      bg.color = "grey85",
+                      title = "Resolution : 1 km²", 
+                      title.size = 0.6, 
+                      title.position = c(0.01, 0.96)) +
+      tmap::tm_credits("© CRA-W", position = c(.87, 0))
+    
+    interactive <- tmap_leaflet(static)
+    
+    
+
+    
+  }

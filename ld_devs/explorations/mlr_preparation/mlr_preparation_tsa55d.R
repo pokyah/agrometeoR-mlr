@@ -11,10 +11,10 @@ records.stations.df <- prepare_agromet_API_data.fun(
   get_from_agromet_API.fun(
     user_token.chr = Sys.getenv("AGROMET_API_V1_KEY"),
     table_name.chr = "cleandata",
-    stations_ids.chr = "all",
-    sensors.chr = "tsa,ens,hra, hct",
-    dfrom.chr = "2018-05-01",
-    dto.chr = "2018-05-06",
+    stations_ids.chr = "1,4,7,9,10,13,14,15,17,18,19,23,24,25,26,27,29,30,32,33,34,35,37,38,39,40,41,42,61",
+    sensors.chr = "tsa,ens",
+    dfrom.chr = "2018-04-01",
+    dto.chr = "2018-05-25",
     api_v.chr = "v2"
   ), "cleandata"
 )
@@ -26,9 +26,7 @@ records.stations.df <- records.stations.df %>%
   filter(!is.na(to)) %>%
   filter(state == "Ok") %>%
   filter(!is.na(tsa)) %>%
-  filter(!is.na(ens)) %>%
-  filter (!is.na(hra)) %>%
-  filter(!is.na(hct))
+  filter(!is.na(ens)) 
 
 
 load("./data/expl.static.stations.sf.rda")
@@ -38,7 +36,7 @@ expl.static.stations.sf <- expl.static.stations.sf %>%
 
 # Selecting only the useful features
 records.stations.df <- records.stations.df %>%
-  dplyr::select("mtime", "sid", "tsa" ,"ens", "hra", "hct", "longitude", "latitude")
+  dplyr::select("mtime", "sid", "tsa" ,"ens", "longitude", "latitude")
 colnames(records.stations.df)[2] <- "gid"
 
 # Preparing for spatial join of dynamic and static expl vars
@@ -51,9 +49,9 @@ records.stations.sf <- st_transform(records.stations.sf, crs = lambert2008.crs)
 data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf,
                                            dynamic.vars = records.stations.sf,
                                            target.chr = "tsa",
-                                           feat_to_drop.chr = c("hra", "hct"),
+                                           feat_to_drop.chr = NULL,
                                            filter_method.chr = "linear.correlation",
-                                           filter_abs.num = 3)
+                                           filter_abs.num = 2)
 
 # defining the learner
 # lrn <- list(makeFilterWrapper(makeLearner(cl = "regr.lm", id="linear regression"),
@@ -88,7 +86,7 @@ bmr.l <- benchmark(
 
 # # computing performances of the benchmark
 # perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-# # mean mse.test.mean : 1.494918
+# # mean mse.test.mean : 1.679534
 # # predicting temperature
 # tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
@@ -109,21 +107,21 @@ data.stations.n.df <- data.stations.n.df %>%
 load("./data/expl.static.grid.df.rda")
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 02:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
   dplyr::select(gid, geometry, response, se)
 
 # Create the virtual stations interpolation grid points
-grid.1000.pg.sf <- build.vs.grid.fun(
-  res.num = 1000,
-  geom.chr = "polygons",
-  sf.bool = TRUE,
-  EPSG.chr = "3812",
-  country_code.chr = "BE",
-  NAME_1.chr = "Wallonie"
-)
+# grid.1000.pg.sf <- build.vs.grid.fun(
+#   res.num = 1000,
+#   geom.chr = "polygons",
+#   sf.bool = TRUE,
+#   EPSG.chr = "3812",
+#   country_code.chr = "BE",
+#   NAME_1.chr = "Wallonie"
+# )
 spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_error.sf = spatialized.tsa_error.sf,
                                                             grid.pg.sf = grid.1000.pg.sf,
                                                             sf.bool = TRUE)
@@ -133,13 +131,11 @@ spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_er
 # but needs a sf made of polygons if you want to
 map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.pg.sf,
                       method.chr = "lm",
-                      date.chr = "2018-05-02 14:00:00",
+                      date.chr = "2018-05-02 15:00:00",
                       type.chr = "interactive",
                       country_code.chr = "BE",
                       NAME_1.chr = "Wallonie",
-                      error.bool = TRUE,
-                      error_layer.bool = FALSE,
-                      alpha_error.num = NULL
+                      error.bool = TRUE
                       )
 map
 
@@ -147,6 +143,7 @@ map
 ### Investigation clc
 
 # load clc data
+library(raster)
 cover.sf <- build_cover.sf.fun(country_code.chr = "BE",
                                NAME_1.chr = "Wallonie", 
                                EPSG.chr = "3812", 
@@ -161,12 +158,12 @@ intersect.clc_agri_herb.tsa_error.sf <- st_intersection(st_buffer(cover_agri_her
 mean(spatialized.tsa_error.pg.sf$se, na.rm = TRUE)
 mean(intersect.clc_agri_herb.tsa_error.sf$se, na.rm = TRUE)
 
-comparison.error.14h.df <- data.frame(all = c(0.2296342, 0.2586641, 0.2426308, 0.3147623),
-                                  agri_herb = c(0.223103, 0.2513072, 0.23573, 0.2971088))
-comparison.error.02h.df <- data.frame(all = c(0.1811774, 1.677342, 0.4105654, 2.301967, 2.318585),
-                                      agri_herb = c(0.1701147, 1.147165, 0.3988881, 1.577538, 1.559047))
-comparison.error.21h.df <- data.frame(all = c(1.296648, 0.3924904, 0.5929122, 0.3999723, 1.989951),
-                                      agri_herb = c(0.9087129, 0.3813272, 0.556709, 0.3893994, 1.363713))
+comparison.error.14h.55d.df <- data.frame(all = c(0.2219171, 0.223256, 0.229797, 0.2698662),
+                                  agri_herb = c(0.2172349, 0.2185456, 0.2249486, 0.2632026))
+comparison.error.02h.55d.df <- data.frame(all = c(0.1409509),
+                                      agri_herb = c(0.137977))
+comparison.error.21h.55d.df <- data.frame(all = c(),
+                                      agri_herb = c())
 comparison.error.mean.df <- data.frame(hour = c("02:00:00", "14:00:00", "21:00:00"),
                                        all = c(mean(comparison.error.02h.df$all), mean(comparison.error.14h.df$all), mean(comparison.error.21h.df$all)),
                                        agri_herb = c(mean(comparison.error.02h.df$agri_herb), mean(comparison.error.14h.df$agri_herb), mean(comparison.error.21h.df$agri_herb)))
