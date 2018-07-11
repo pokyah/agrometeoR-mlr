@@ -1,0 +1,47 @@
+---
+title: "gstat to mlr investigations"
+author: "Thomas Goossens"
+date: "7/10/2018"
+output: html_document
+---
+## theory combined with R
+* https://www.r-project.org/conferences/DSC-2003/Proceedings/Pebesma.pdf
+* https://www.researchgate.net/publication/266418957_A_minimal_introduction_to_geostatistics_with_Rgstat
+* https://www.sciencedirect.com/science/article/pii/S0341816213002385
+* https://www.researchgate.net/publication/268218675_Geostatistics_examples_in_R_ordinary_kriging_universal_kriging_and_inverse_distance_weighted
+* http://www.css.cornell.edu/faculty/dgr2/teach/R/gs_short_ex.pdf
+
+## understanding the different types of kriging
+* http://r-sig-geo.2731867.n2.nabble.com/gstat-krige-regression-kriging-vs-kriging-with-external-drift-td7589206.html
+
+# implementing to mlr
+* https://mlr-org.github.io/mlr/articles/tutorial/devel/create_learner.html
+* https://www.r-spatial.org/r/2016/02/14/gstat-variogram-fitting.html
+* https://github.com/mlr-org/mlr/blob/master/R/RLearner_regr_km.R
+* https://www.rdocumentation.org/packages/DiceKriging/versions/1.5.5/topics/km
+
+## the gstat krige function actaully build the object and makes the predictions. We need to decompose it ! this one is the function to be used
+* https://www.rdocumentation.org/packages/gstat/versions/1.1-6/topics/gstat
+* autofitting the variogram https://www.r-spatial.org/r/2016/02/14/gstat-variogram-fitting.html
+* https://cran.r-project.org/web/packages/automap/automap.pdf
+* http://spatial-analyst.net/wiki/index.php/Best_Combined_Spatial_Prediction
+* http://pebesma.staff.ifgi.de/modellierung/course.pdf
+
+## Automap might be the good bet for autofittig vgm model
+* https://cran.r-project.org/web/packages/automap/automap.pdf
+* http://www.numbertheory.nl/2013/02/17/automatic-spatial-interpolation-with-r-the-automap-package/
+* actually not useful anymore since gstat can also perform autofitting of vg https://www.r-spatial.org/r/2016/02/14/gstat-variogram-fitting.html
+
+
+## Starting point for test. We need multivariate !
+* https://rstudio-pubs-static.s3.amazonaws.com/63374_8651f7cd6b2d41a5bba5708d2b40f24e.html
+* https://rpubs.com/nabilabd/118172 ==> PERFECT begining point !
+* https://www.stat.berkeley.edu/~arturof/Teaching/STAT248/lab10_part2.html
+* https://cran.r-project.org/web/packages/gstat/vignettes/gstat.pdf
+* http://www.css.cornell.edu/faculty/dgr2/teach/R/gs_short_ex.pdf
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
