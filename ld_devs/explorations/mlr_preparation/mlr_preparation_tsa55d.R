@@ -107,7 +107,7 @@ data.stations.n.df <- data.stations.n.df %>%
 load("./data/expl.static.grid.df.rda")
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-05 21:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-01 17:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
@@ -129,17 +129,21 @@ spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_er
 # visualize the map
 # function needs a sf made of points if you do not want to visualize error
 # but needs a sf made of polygons if you want to
-map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.sf,
+map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.pg.sf,
                       method.chr = "lm",
                       date.chr = "2018-05-02 14:00:00",
                       type.chr = "interactive",
                       country_code.chr = "BE",
                       NAME_1.chr = "Wallonie",
-                      error.bool = FALSE,
+                      error.bool = TRUE,
                       error_layer.bool = TRUE,
-                      alpha_error.num = 0.8
-)
+                      alpha_error.num = NULL)
 map
+
+
+
+
+
 
 prediction_tsa.map <- make.map.tsa_prediction.fun(spatial.data.sf = spatialized.tsa_error.sf,
                                                   type.chr = "interactive",
@@ -175,9 +179,9 @@ comparison.error.02h.55d.df <- data.frame(all = c(0.1409509, 0.5373542, 0.310238
                                       agri_herb = c(0.137977, 0.5019015, 0.3046453, 1.496699, 1.418927))
 comparison.error.21h.55d.df <- data.frame(all = c(0.3865789, 0.3772858, 0.4651825, 0.3557736, 1.813699),
                                       agri_herb = c(0.3784226, 0.3693255, 0.4553678, 0.3469886, 1.23285))
-comparison.error.mean.df <- data.frame(hour = c("02:00:00", "14:00:00", "21:00:00"),
-                                       all = c(mean(comparison.error.02h.df$all), mean(comparison.error.14h.df$all), mean(comparison.error.21h.df$all)),
-                                       agri_herb = c(mean(comparison.error.02h.df$agri_herb), mean(comparison.error.14h.df$agri_herb), mean(comparison.error.21h.df$agri_herb)))
+comparison.error.mean.55d.df <- data.frame(hour = c("02:00:00", "14:00:00", "21:00:00"),
+                                       all = c(mean(comparison.error.02h.55d.df$all), mean(comparison.error.14h.55d.df$all), mean(comparison.error.21h.55d.df$all)),
+                                       agri_herb = c(mean(comparison.error.02h.55d.df$agri_herb), mean(comparison.error.14h.55d.df$agri_herb), mean(comparison.error.21h.55d.df$agri_herb)))
 
 map_comparison <- create_map_tsa.comparison_clc(spatial_data.sf = spatialized.tsa_error.sf,
                                                 clc.sf = cover_agri_herb.sf,

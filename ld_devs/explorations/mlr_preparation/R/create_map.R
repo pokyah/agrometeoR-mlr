@@ -31,23 +31,6 @@ create_map_tsa <- function(
   if(error.bool == TRUE){
     
     spatial_data.sp <- as(spatial_data.sf, "Spatial")
-    
-    # define response minimum, response maximum, and response difference
-    min_resp = round(min(spatial_data.sp@data$response, na.rm = TRUE), digits = 2)
-    max_resp = round(max(spatial_data.sp@data$response, na.rm = TRUE), digits = 2)
-    int_resp = round(((max_resp - min_resp)/10), digits = 2)
-    # create a vector with legend breaks
-    legend_label = c(min_resp,
-                    min_resp + int_resp,
-                    min_resp + 2*int_resp,
-                    min_resp + 3*int_resp,
-                    min_resp + 4*int_resp,
-                    min_resp + 5*int_resp,
-                    min_resp + 6*int_resp,
-                    min_resp + 7*int_resp,
-                    min_resp + 8*int_resp,
-                    min_resp + 9*int_resp,
-                    max_resp)
 
     # file <- "./fig/craw.png"
     # choose boundaries to display
@@ -56,12 +39,24 @@ create_map_tsa <- function(
   
     # build the map
     static <- tmap::tm_shape(spatial_data.sp, projection="3812") +            # Projection : Belgian Lambert
-      tm_fill(col = "RGB") +               # use RGB column of your data to fill grid cells
-      tm_add_legend(type = "fill",         # legend which links colors to temperature (response)
-                    labels = legend_label, 
-                    col = colorRampPalette(rev(brewer.pal(n=11, name='RdYlBu')))(11),
-                    title = "Temperature (°C)",
-                    border.lwd = 0) +
+      tm_fill(col = "response",
+              popup.vars = c("response", "se"),
+              title = "Temperature (°C)",
+              palette = "-RdYlBu",
+              auto.palette.mapping = FALSE,
+              lwd = 0,
+              popup.format = list(digits = 3),
+              breaks = c(stats::quantile(spatial_data.sp$response, 0, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.1, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.2, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.3, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.4, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.5, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.6, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.7, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.8, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 0.9, na.rm = TRUE),
+                         stats::quantile(spatial_data.sp$response, 1, na.rm = TRUE))) + 
       tmap::tm_compass(position = c(0.9,0.15), color.light = "grey20") +      # north
       tmap::tm_scale_bar(breaks = NULL, width = NA, size = 0.8, text.color = "grey20",  # scale bar 
                    color.dark = "grey20", color.light = "white", lwd = 1, position = c(0.22,0.01),
@@ -86,25 +81,25 @@ create_map_tsa <- function(
       tmap::tm_credits("© CRA-W", position = c(.87, 0))
     
     if(error_layer.bool == TRUE){
-
+      
       spatial_error.sp <- spatial_data.sp
       static <- static +
-        tm_shape(spatial_data.sp, is.master = TRUE) +
-        tm_raster("se",
-                  alpha = alpha_error.num,
-                  saturation = 0,
-                  title = "Standard error",
-                  breaks = c(stats::quantile(spatial_error.sp$se, 0, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.1, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.2, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.3, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.4, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.5, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.6, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.7, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.8, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 0.9, na.rm = TRUE),
-                             stats::quantile(spatial_error.sp$se, 1, na.rm = TRUE)))
+        tm_shape(spatial_error.sp, is.master = TRUE) +
+        tm_fill("se",
+                palette = whiteAlpha(),
+                auto.palette.mapping = FALSE,
+                title = "Standard error")
+                # breaks = c(stats::quantile(spatial_error.sp$se, 0, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.1, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.2, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.3, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.4, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.5, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.6, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.7, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.8, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 0.9, na.rm = TRUE),
+                #            stats::quantile(spatial_error.sp$se, 1, na.rm = TRUE)))
     }
     
     if(type.chr == "static") {
