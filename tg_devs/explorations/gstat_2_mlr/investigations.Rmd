@@ -13,6 +13,7 @@ output: html_document
 
 ## understanding the different types of kriging
 * http://r-sig-geo.2731867.n2.nabble.com/gstat-krige-regression-kriging-vs-kriging-with-external-drift-td7589206.html
+* http://r-sig-geo.2731867.n2.nabble.com/gstat-krige-regression-kriging-vs-kriging-with-external-drift-tt7589206.html#none
 
 # implementing to mlr
 * https://mlr-org.github.io/mlr/articles/tutorial/devel/create_learner.html
