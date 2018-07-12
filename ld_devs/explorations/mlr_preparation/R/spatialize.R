@@ -20,64 +20,29 @@
 #'---
 
 
-spatialize <- function(records.df, task.id.chr, learner.id.chr, learner.cl.chr, target.chr, prediction_grid.df){
+spatialize <- function(learner.cl.chr, learner.id.chr, task, prediction_grid.df, predict.type){
   
   require(mlr)
-  records.df <- data.frame(records.df)
-  
-  # creating the regression task
-  regr.task = mlr::makeRegrTask(
-    id = task.id.chr,
-    data = data.frame(records.df$data[c("altitude", "tsa")]),
-    target = target.chr,
-    coordinates = records.df$data[c("longitude", "latitude")]
-  )
-  
-  # Get some information about the task
-  getTaskDesc(regr.task)
   
   # create the response learner
-  resp.regr.lrn = mlr::makeLearner(
+  regr.lrn = mlr::makeLearner(
     cl = learner.cl.chr ,
     id = learner.id.chr,
-    predict.type = "response" #could also be "se"
+    predict.type = predict.type # could  be "response" or "se"
   )
 
-  #train the resp learner to create the regr model on our dataset
-  resp.regr.mod = train(resp.regr.lrn, regr.task)
-  
-  # create the standard error learner
-  se.regr.lrn = mlr::makeLearner(
-    cl = "regr.lm",
-    id = "re.regr.lm",
-    predict.type = "se"
-  )
-  
-  # train the se learner to create the model on our dataset
-  se.regr.mod = train(se.regr.lrn, regr.task)
-  
-  # Get infos about the model
-  resp.regr.mod$learner
-  # print(resp.regr.mod$learner.model)
-  # print(summary(resp.regr.mod$learner.model))
-  # print(resp.regr.mod$features)
-  # print(resp.regr.mod$task.desc$size)
-  
+  # train the resp learner to create the regr model on our dataset
+  regr.mod = train(regr.lrn, task)
+
   # Compute the model response for the target on the grid
-  resp.task.pred = predict(
-    object = resp.regr.mod,
+  task.pred = predict(
+    object = regr.mod,
     newdata = prediction_grid.df
   )
   
-  # Compute the model SE for the target on the grid
-  resp.task.pred = predict(
-    object = resp.regr.mod,
-    newdata = prediction_grid.df
-  )
-
   # Group in a spatial sf
   #pred_data.grid.df <- dplyr::bind_cols(prediction_grid.df, as.data.frame(resp.task.pred), as.data.frame(se.task.pred))
-  pred_data.grid.df <- dplyr::bind_cols(prediction_grid.df, as.data.frame(resp.task.pred))
+  pred_data.grid.df <- dplyr::bind_cols(prediction_grid.df, as.data.frame(task.pred))
   # pred_data.grid.sf <- tsa.model.sf <- st_as_sf(x = pred_data.grid.df, 
   #                                               coords = c("longitude", "latitude"),
   #                                               crs = 4326)
