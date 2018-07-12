@@ -9,6 +9,75 @@ library(dplyr)
 source("gstat.R")
 ```
 
+##trend surfaces
+### trend surfaces - raw gstat
+```{r}
+# loading the data
+data(meuse)
+data(meuse.grid)
+# imputing values to missing data
+meuse = impute(meuse, classes = list(numeric = imputeMean(), factor = imputeMode()),
+  dummy.classes = "integer")$data
+meuse.grid = impute(meuse.grid, classes = list(numeric = imputeMean(), factor = imputeMode()),
+  dummy.classes = "integer")$data
+# making spatial
+coordinates(meuse) = ~x+y
+coordinates(meuse.grid) = ~x+y
+gridded(meuse.grid) = TRUE
+# interpolating
+ts.raw <- meuse.grid
+ts.raw$ts1 = krige(log(zinc) ~ 1, meuse, meuse.grid, degree = 1)$var1.pred
+ts.raw$ts2 = krige(log(zinc) ~ 1, meuse, meuse.grid, degree = 2)$var1.pred
+ts.raw$ts3 = krige(log(zinc) ~ 1, meuse, meuse.grid, degree = 3)$var1.pred
+# mapping
+ts.raw.plot <- spplot(ts.raw, c("ts1", "ts2", "ts3"), main = "log(zinc), trend surface interpolation")
+ts.raw.plot
+```
+
+### trend surfaces - mlr gstat
+```{r}
+# loading the data
+data(meuse)
+data(meuse.grid)
+# imputing values to missing data
+meuse = impute(meuse, classes = list(numeric = imputeMean(), factor = imputeMode()),
+  dummy.classes = "integer")$data
+meuse.grid = impute(meuse.grid, classes = list(numeric = imputeMean(), factor = imputeMode()),
+  dummy.classes = "integer")$data
+# adding a column with log zinc
+meuse <- meuse %>% dplyr::mutate(log_zinc = log(zinc))
+# defining the regression task
+task = makeRegrTask(id = "meuse",  data = meuse, target = "log_zinc")
+task.ts<- dropFeatures(task = task, features = getTaskFeatureNames(task)[-c(1,2)])
+# defining the learner
+lrn.ts.1 = makeLearner(cl = "regr.gstat", id= "mlr-ts1", degree = 1, locations = ~x+y)
+lrn.ts.2 = makeLearner(cl = "regr.gstat", id= "mlr-ts2", degree = 2, locations = ~x+y)
+lrn.ts.3 = makeLearner(cl = "regr.gstat", id= "mlr-ts3", degree = 3, locations = ~x+y)
+# training the learners
+mod.ts.1 = train(lrn.ts.1, task.ts)
+mod.ts.2 = train(lrn.ts.2, task.ts)
+mod.ts.3 = train(lrn.ts.3, task.ts)
+# interpolating
+ts.mlr <- meuse.grid
+newdata.pred.ts.1 = predict(mod.ts.1, newdata = meuse.grid)
+ts.mlr$mlr.ts.1<- (bind_cols(data.frame(meuse.grid), newdata.pred.ts.1$data))$response
+newdata.pred.ts.2 = predict(mod.ts.2, newdata = meuse.grid)
+ts.mlr$mlr.ts.2 <- (bind_cols(data.frame(meuse.grid), newdata.pred.ts.2$data))$response
+newdata.pred.ts.3 = predict(mod.ts.3, newdata = meuse.grid)
+ts.mlr$mlr.ts.3 <- (bind_cols(data.frame(meuse.grid), newdata.pred.ts.3$data))$response
+# mapping
+coordinates(ts.mlr) <- ~x+y
+gridded(ts.mlr) = TRUE
+ts.mlr.plot <- spplot(ts.mlr, c("mlr.ts.1", "mlr.ts.2", "mlr.ts.3"), main = "log(zinc), trend surface interpolation")
+ts.mlr.plot
+```
+### identical predictions ? 
+```{r}
+identical(ts.mlr$mlr.ts.1, ts.raw$ts1)
+identical(ts.mlr$mlr.ts.2, ts.raw$ts2)
+identical(ts.mlr$mlr.ts.3, ts.raw$ts3)
+```
+
 
 ## idw
 ### idw - raw gstat
@@ -171,6 +240,7 @@ lzn.kriged.plot
 se.lzn.kriged.plot <- spplot(lzn.kriged["var1.var"], do.log = F, colorkey = TRUE, main ="var log(zn) kriging with external drift")
 se.lzn.kriged.plot
 ```
+
 ### mlr gstat
 ```{r}
 # loading the data
@@ -214,6 +284,7 @@ gridded(se.mlr.krg) = TRUE
 se.plot  <- spplot(se.mlr.krg["se"], do.log = T, colorkey = TRUE, main = se.mod.krg$learner$id)
 se.plot 
 ```
+
 ### identical predictions ? 
 ```{r}
 identical(lzn.kriged["var1.pred"]@data[[1]], mlr.krg["response"]@data[[1]])
