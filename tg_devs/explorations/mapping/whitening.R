@@ -4,7 +4,7 @@ library(geojsonio)
 
 alphaPal <- function(color) {
   alpha <- seq(0,1,0.1)
-  r <- col2rgb(color, alpha=T)
+  r <- col2hsv(color, alpha=T)
   r <- t(apply(r, 1, rep, length(alpha)))
   # Apply alpha
   r[4,] <- alpha*255
@@ -15,7 +15,8 @@ alphaPal <- function(color) {
 
 load("~/Documents/code/agrometeor/agrometeoR-mlr/data/expl.static.stations.sf.rda")
 
-leafletize(expl.static.stations.sf)
+test.sf <- st_transform(expl.static.stations.sf, crs = 4326)
+test.sp <- as(test.sf, "Spatial")
 
 leafletize <- function(records.sf){
   responsiveness.chr = "\'<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\'"
@@ -34,6 +35,25 @@ leafletize <- function(records.sf){
               sf::st_bbox(records.sf)[[3]],
               sf::st_bbox(records.sf)[[4]]
     ) %>%
+    addPolygons(records.sf,
+      fillColor = ~pal(slope),
+      weight = 2,
+      opacity = 1,
+      color = "white",
+      dashArray = "3",
+      fillOpacity = 0.7,
+      highlight = highlightOptions(
+        weight = 5,
+        color = "#666",
+        dashArray = "",
+        fillOpacity = 0.7,
+        bringToFront = TRUE),
+      label = labels,
+      labelOptions = labelOptions(
+        style = list("font-weight" = "normal", padding = "3px 8px"),
+        textsize = "15px",
+        direction = "auto")
+    ) %>%
     addLayersControl(baseGroups = c("Stamen", "Satellite"),
                      overlayGroups = c("slope", "altitude"),
                      options = layersControlOptions(collapsed = TRUE)
@@ -48,10 +68,28 @@ leafletize <- function(records.sf){
   return(template.map)
 }
 
+m <- leafletize(test.sp)
 
 
-
-
+m %>%
+  addPolygons(
+    fillColor = ~pal(slope),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) %>%
 
 
 
