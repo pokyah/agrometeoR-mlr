@@ -27,6 +27,7 @@ create_map_tsa <- function(
   library(tmap)
   library(tmaptools)
   library(RColorBrewer)
+  library(leaflet)
   
   if(error.bool == TRUE){
     
@@ -83,10 +84,17 @@ create_map_tsa <- function(
     if(error_layer.bool == TRUE){
       
       spatial_error.sp <- spatial_data.sp
+      pal <- colorBin(palette = alphaPal("green"), domain= spatial_error.sp@data$se, pretty = TRUE, na.color = "#808080",
+                      alpha = TRUE, reverse = FALSE, right = FALSE)
+      pal_white <- c(rgb(1,1,1, alpha = 0),
+                     rgb(1,1,1, alpha = 0.1),
+                     rgb(1,1,1, alpha = 0.5),
+                     rgb(1,1,1, alpha = 0.8))
+      
       static <- static +
         tm_shape(spatial_error.sp, is.master = TRUE) +
         tm_fill("se",
-                palette = whiteAlpha(),
+                palette = pal_white,
                 auto.palette.mapping = FALSE,
                 title = "Standard error")
                 # breaks = c(stats::quantile(spatial_error.sp$se, 0, na.rm = TRUE),

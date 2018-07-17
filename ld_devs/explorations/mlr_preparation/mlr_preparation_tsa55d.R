@@ -107,7 +107,7 @@ data.stations.n.df <- data.stations.n.df %>%
 load("./data/expl.static.grid.df.rda")
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-01 17:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
@@ -122,38 +122,31 @@ spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
 #   country_code.chr = "BE",
 #   NAME_1.chr = "Wallonie"
 # )
-spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_error.sf = spatialized.tsa_error.sf,
-                                                            grid.pg.sf = grid.1000.pg.sf,
-                                                            sf.bool = TRUE)
+# spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_error.sf = spatialized.tsa_error.sf,
+#                                                             grid.pg.sf = grid.1000.pg.sf,
+#                                                             sf.bool = TRUE)
 
 # visualize the map
-# function needs a sf made of points if you do not want to visualize error
-# but needs a sf made of polygons if you want to
-map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.pg.sf,
-                      method.chr = "lm",
-                      date.chr = "2018-05-02 14:00:00",
-                      type.chr = "interactive",
-                      country_code.chr = "BE",
-                      NAME_1.chr = "Wallonie",
-                      error.bool = TRUE,
-                      error_layer.bool = TRUE,
-                      alpha_error.num = NULL)
-map
+# get Wallonia boundaries
+boundaries.sp <- raster::getData('GADM', country="BE", level=1, path = "./external-data/Boundaries") %>%
+  subset(NAME_1 == "Wallonie")
+boundaries.sp <- spTransform(boundaries.sp, CRSobj = lambert2008.crs)
+boundaries.sf <- st_as_sf(boundaries.sp)
+st_crs(boundaries.sf) <- lambert2008.crs
 
+spatialized.tsa_error.sp <- as(spatialized.tsa_error.sf, "Spatial") %>%
+  as(., "SpatialPixelsDataFrame") %>%
+  as(., "SpatialGridDataFrame")
+spatialized.tsa_error.df <- as.data.frame(spatialized.tsa_error.sp)
 
-
-
-
-
-prediction_tsa.map <- make.map.tsa_prediction.fun(spatial.data.sf = spatialized.tsa_error.sf,
-                                                  type.chr = "interactive",
-                                                  method.chr = "lm",
-                                                  date.chr = "2018-05-02 14:00:00",
-                                                  country_code.chr = "BE",
-                                                  NAME_1.chr = "Wallonie",
-                                                  overlay.bool = T)
-prediction_tsa.map
-
+ggmap <- static.ggmap(gridded.data.df =spatialized.tsa_error.df,
+             boundaries.sf = boundaries.sf,
+             layer.error.bool = T,
+             legend.error.bool = F,
+             pretty_breaks.bool = T,
+             title.chr = "Interpolated temperature with multiple linear regression - 2018-05-02 14:00:00",
+             target.chr = "tsa")
+ggmap
 
 ### Investigation clc
 
