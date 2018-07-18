@@ -105,7 +105,7 @@ data.stations.n.df <- data.stations.n.df %>%
   ))
 
 # spatialize prediction and error on the grid of Wallonia
-load("./data/expl.static.grid.df.rda")
+load("./data/expl.static.grid.df.rda") # be careful it is a sf but it is more efficient (::todo:: modify generate independent variables)
 # expl.static.grid.df <- data.frame(dplyr::bind_cols(expl.static.grid.df, data.frame(sf::st_coordinates(expl.static.grid.df))))
 grid.1000.pt.sp <- build.vs.grid.fun(
   res.num = 1000,
@@ -116,14 +116,16 @@ grid.1000.pt.sp <- build.vs.grid.fun(
   NAME_1.chr = "Wallonie"
 )
 load("./data/dssf.0103_3105.df.rda")
+# get ens on virtual grid
 dssf.n.df <- dssf.0103_3105.df %>%
   group_by(mhour) %>%
   nest()
-dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-04-16 16:00:00", grid.1000.pt.sp)
+dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-05-02 14:00:00", grid.1000.pt.sp)
+# add ens variable to prediction grid
 expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-04-16 16:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
@@ -150,6 +152,7 @@ boundaries.sp <- spTransform(boundaries.sp, CRSobj = lambert2008.crs)
 boundaries.sf <- st_as_sf(boundaries.sp)
 st_crs(boundaries.sf) <- lambert2008.crs
 
+# prepare data to be visualized (transform from points to polygons and then storing them in a df)
 spatialized.tsa_error.sp <- as(spatialized.tsa_error.sf, "Spatial") %>%
   as(., "SpatialPixelsDataFrame") %>%
   as(., "SpatialGridDataFrame")
