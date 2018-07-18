@@ -1,6 +1,7 @@
 source("./R/file_management.R")
 source_files_recursively.fun("./R")
 source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
+source_files_recursively.fun("./ld_devs/explorations/solar_irradiance/R")
 
 library(tidyverse)
 library(sf)
@@ -36,7 +37,7 @@ expl.static.stations.sf <- expl.static.stations.sf %>%
 
 # Selecting only the useful features
 records.stations.df <- records.stations.df %>%
-  dplyr::select("mtime", "sid", "tsa" ,"ens", "longitude", "latitude")
+  dplyr::select("mtime", "sid", "ens", "longitude", "latitude", "tsa")
 colnames(records.stations.df)[2] <- "gid"
 
 # Preparing for spatial join of dynamic and static expl vars
@@ -84,11 +85,11 @@ bmr.l <- benchmark(
   measures = list(mse, timetrain)
 )
 
-# # computing performances of the benchmark
-# perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-# # mean mse.test.mean : 1.679534
-# # predicting temperature
-# tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
+# computing performances of the benchmark
+perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
+# mean mse.test.mean : 
+# predicting temperature
+tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
 # get coefficents from regression model equation
 data.stations.n.df <- data.stations.n.df %>%
@@ -105,9 +106,24 @@ data.stations.n.df <- data.stations.n.df %>%
 
 # spatialize prediction and error on the grid of Wallonia
 load("./data/expl.static.grid.df.rda")
+# expl.static.grid.df <- data.frame(dplyr::bind_cols(expl.static.grid.df, data.frame(sf::st_coordinates(expl.static.grid.df))))
+grid.1000.pt.sp <- build.vs.grid.fun(
+  res.num = 1000,
+  geom.chr = "centers",
+  sf.bool = F,
+  EPSG.chr = "3812",
+  country_code.chr = "BE",
+  NAME_1.chr = "Wallonie"
+)
+load("./data/dssf.0103_3105.df.rda")
+dssf.n.df <- dssf.0103_3105.df %>%
+  group_by(mhour) %>%
+  nest()
+dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-04-16 16:00:00", grid.1000.pt.sp)
+expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-04-16 16:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%

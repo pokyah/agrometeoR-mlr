@@ -30,10 +30,10 @@ spatialize <- function(learner.cl.chr, learner.id.chr, task, prediction_grid.df,
     id = learner.id.chr,
     predict.type = predict.type # could  be "response" or "se"
   )
-
+  
   # train the resp learner to create the regr model on our dataset
   regr.mod = train(regr.lrn, task)
-
+  
   # Compute the model response for the target on the grid
   task.pred = predict(
     object = regr.mod,

@@ -65,7 +65,8 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
     data.stations.n.df$filtered_tasks,
     mlr::filterFeatures,
     method = filter_method.chr,
-    abs = filter_abs.num
+    abs = filter_abs.num#,
+    # mandatory.feat = "ens"
   )
   
   return(data.stations.n.df)
