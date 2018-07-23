@@ -45,6 +45,7 @@ records.stations.sf <- st_as_sf(records.stations.df, coords = c("longitude", "la
 st_crs(records.stations.sf) <- "+proj=longlat +datum=WGS84 +no_defs"
 lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
 records.stations.sf <- st_transform(records.stations.sf, crs = lambert2008.crs)
+records.stations.sf <- dplyr::bind_cols(records.stations.sf, data.frame(sf::st_coordinates(records.stations.sf)))
 
 # Make tasks
 data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf,
@@ -54,10 +55,33 @@ data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf
                                            filter_method.chr = "linear.correlation",
                                            filter_abs.num = 2)
 
+data.stations.n.df <- data.stations.n.df %>%
+  mutate(ens.herb.task = purrr::map2(
+    paste0(as.character(mtime),"-ens.herb"),
+    data_as_df,
+    mlr::makeRegrTask,
+    target = "tsa"
+  ))
+data.stations.n.df$alt.task <- purrr::map(data.stations.n.df$alt.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "herbaceous", "X", "Y", "ens"))
+data.stations.n.df$ens.task <- purrr::map(data.stations.n.df$ens.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "herbaceous", "X", "Y", "altitude"))
+data.stations.n.df$alt.ens.task <- purrr::map(data.stations.n.df$alt.ens.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$crops.task <- purrr::map(data.stations.n.df$crops.task, dropFeatures, features = c("slope", "aspect", "roughness", "ens", "altitude", "artificial", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$herb.task <- purrr::map(data.stations.n.df$herb.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "ens", "altitude", "X", "Y"))
+data.stations.n.df$artif.task <- purrr::map(data.stations.n.df$artif.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "altitude", "ens", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$ens.crops.task <- purrr::map(data.stations.n.df$ens.crops.task, dropFeatures, features = c("slope", "aspect", "roughness", "altitude", "artificial", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$ens.herb.task <- purrr::map(data.stations.n.df$ens.herb.task, dropFeatures, features = c("slope", "aspect", "roughness", "altitude", "artificial", "forest", "crops", "X", "Y"))
+data.stations.n.df$ens.alt.crops.task <- purrr::map(data.stations.n.df$ens.alt.crops.task, dropFeatures, features = c("slope", "aspect", "roughness", "artificial", "forest", "herbaceous", "X", "Y"))
+
+
 # defining the learner
 # lrn <- list(makeFilterWrapper(makeLearner(cl = "regr.lm", id="linear regression"),
 #                               fw.method = "linear.correlation", threshold = 0.25))
 lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
+
+lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt"), fw.method = "linear.correlation", fw.mandatory.feat = "altitude", fw.abs = 1),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 1),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt.ens"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "altitude"), fw.abs = 2))
+
 
 # defining the validation (resampling) strategy
 resampling.l = mlr::makeResampleDesc(
@@ -75,21 +99,42 @@ resampling.l = mlr::makeResampleDesc(
 # we also have the option to use an automatic feature selector by fusing it to the learner (see mlr doc).
 # defining the learner who will be used by taking the one with the lowest RMSE from the bmr experiment
 
-bmr.l <- benchmark(
-  learners = lrn,
-  tasks = data.stations.n.df$filtered_tasks,
+bmr.w.l <- benchmark(
+  learners = lrns.l,
+    tasks = data.stations.n.df$tasks,
+    # list(data.stations.n.df$alt.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #      data.stations.n.df$ens.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$alt.ens.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$crops.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$herb.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$artif.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$ens.crops.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$ens.herb.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$ens.alt.crops.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]]),
   resamplings = resampling.l,
-  keep.pred = TRUE,
+  keep.pred = T,
   show.info = FALSE,
   models = FALSE,
-  measures = list(mse, timetrain)
+  measures = list(rmse, timetrain)
 )
 
+# plotBMRBoxplots(bmr.l, measure = mse, order.tsks = getBMRTaskIds(bmr.l))
+plotBMRRanksAsBarChart(bmr.w.l, pretty.names = F)
+# mlr::plotLearnerPrediction(learner = lrn[[1]],
+                           # task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime=="2018-04-10 11:00:00")]])
+ggplotly(plotBMRSummary(bmr.w.l, measure = rmse, pointsize = 1, pretty.names = F))
+
+bmr.comp.l <- mergeBenchmarkResults(list(bmr.ens.l, bmr.alt.ens.l))
+
 # computing performances of the benchmark
-perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-# mean mse.test.mean : 
+perfs.methods.df <- getBMRAggrPerformances(bmr.w.l,as.df = TRUE, rmse)
+perfs.mean.df <- data.frame(rmse.mean = c(mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.alt.filtered"]),
+                                          mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.ens.filtered"]),
+                                          mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.alt.ens.filtered"]),
+                                          mean(perfs.methods.df$rmse.test.rmse)),
+                            method = c("lm.alt", "lm.ens", "lm.alt.ens", "mean"))
 # predicting temperature
-tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
+# tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
 # get coefficents from regression model equation
 data.stations.n.df <- data.stations.n.df %>%
@@ -103,6 +148,7 @@ data.stations.n.df <- data.stations.n.df %>%
     regr.model,
     getLearnerModel
   ))
+
 
 # spatialize prediction and error on the grid of Wallonia
 load("./data/expl.static.grid.df.rda") # be careful it is a sf but it is more efficient (::todo:: modify generate independent variables)
@@ -201,6 +247,36 @@ map_comparison <- create_map_tsa.comparison_clc(spatial_data.sf = spatialized.ts
 map_comparison
 
 
+### test comparison ens stations and ens eumetsat
+
+comparison.ens.sf <- st_intersection(st_buffer(st_as_sf(expl.static.grid.df,
+                                                        coords = c("X", "Y"),
+                                                        crs = lambert2008.crs), dist = 500),
+                                     records.stations.sf) %>%
+  dplyr::filter(mtime == "2018-05-02 14:00:00")
+
+dssf.0103_3105.l.df <- dssf.0103_3105.df %>%
+  st_as_sf(., coords = c("long", "lat"), crs = "+proj=longlat +datum=WGS84 +no_defs") %>%
+  st_transform(., crs = lambert2008.crs)
+dssf.0103_3105.l.df <- dplyr::bind_cols(dssf.0103_3105.l.df, data.frame(sf::st_coordinates(dssf.0103_3105.l.df)))
+
+dssf.n.l.df <- dssf.0103_3105.l.df %>%
+  group_by(mhour) %>%
+  nest()
+
+dssf.red.n.df <- dssf.n.l.df %>%
+  filter(mhour >= "2018-04-01 00:00:00" & mhour <= "2018-05-25 00:00:00")
+
+data_ens.df <- left_join(dssf.red.n.df, data.stations.n.df, by = c("mhour" = "mtime")) %>%
+  dplyr::select(mhour, data, data_as_df)
+
+data_ens.df <- data_ens.df %>%
+  mutate(comparison_ens = purrr::map2(
+    data,
+    data_as_df,
+    left_join,
+    by = c("X", "Y")
+  ))
 
 
 

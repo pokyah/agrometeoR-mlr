@@ -49,7 +49,7 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
   
   # drop unexplanatory features
   data.stations.n.df <- data.stations.n.df %>%
-    mutate(filtered_tasks = map(
+    mutate(filtered_tasks = purrr::map(
       .x = tasks,
       .f = mlr::dropFeatures,
       features = feat_to_drop.chr
@@ -58,7 +58,7 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
   
   # removing the tasks columns and only keeping the filtered tasks
   data.stations.n.df <- data.stations.n.df %>%
-    dplyr::select(mtime, data_as_df, filtered_tasks)
+    dplyr::select(mtime, data_as_df, tasks, filtered_tasks)
   
   # Define tasks on the 25% best tasks only
   data.stations.n.df$filtered_tasks <-  purrr::map(
