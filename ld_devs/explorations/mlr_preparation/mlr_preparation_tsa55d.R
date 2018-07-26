@@ -3,9 +3,11 @@ source_files_recursively.fun("./R")
 source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 source_files_recursively.fun("./ld_devs/explorations/solar_irradiance/R")
 
+library(geoTools)
 library(tidyverse)
 library(sf)
 library(mlr)
+library(plotly)
 
 # Retrieving from API
 records.stations.df <- prepare_agromet_API_data.fun(
@@ -80,7 +82,8 @@ lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
 
 lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt"), fw.method = "linear.correlation", fw.mandatory.feat = "altitude", fw.abs = 1),
                makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 1),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt.ens"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "altitude"), fw.abs = 2))
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt.ens"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "altitude"), fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens.herb"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "herbaceous"), fw.abs = 2))
 
 
 # defining the validation (resampling) strategy
@@ -118,16 +121,16 @@ bmr.w.l <- benchmark(
   measures = list(rmse, timetrain)
 )
 
-# plotBMRBoxplots(bmr.l, measure = mse, order.tsks = getBMRTaskIds(bmr.l))
+# plotBMRBoxplots(bmr.w.l, measure = rmse, pretty.names = F)
 plotBMRRanksAsBarChart(bmr.w.l, pretty.names = F)
 # mlr::plotLearnerPrediction(learner = lrn[[1]],
                            # task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime=="2018-04-10 11:00:00")]])
 ggplotly(plotBMRSummary(bmr.w.l, measure = rmse, pointsize = 1, pretty.names = F))
 
-bmr.comp.l <- mergeBenchmarkResults(list(bmr.ens.l, bmr.alt.ens.l))
+# bmr.comp.l <- mergeBenchmarkResults(list(bmr.ens.l, bmr.alt.ens.l))
 
 # computing performances of the benchmark
-perfs.methods.df <- getBMRAggrPerformances(bmr.w.l,as.df = TRUE, rmse)
+perfs.methods.df <- getBMRAggrPerformances(bmr.w.l,as.df = TRUE)
 perfs.mean.df <- data.frame(rmse.mean = c(mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.alt.filtered"]),
                                           mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.ens.filtered"]),
                                           mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.alt.ens.filtered"]),
@@ -138,17 +141,34 @@ perfs.mean.df <- data.frame(rmse.mean = c(mean(perfs.methods.df$rmse.test.rmse[p
 
 # get coefficents from regression model equation
 data.stations.n.df <- data.stations.n.df %>%
-  mutate(regr.model = map(
+  mutate(regr.model = purrr::map(
     filtered_tasks,
     train,
     learner = lrn[[1]]
   ))
 data.stations.n.df <- data.stations.n.df %>%
-  mutate(get.model = map(
+  mutate(get.model = purrr::map(
     regr.model,
     getLearnerModel
   ))
 
+models.df <- as.data.frame(data.stations.n.df$mtime)
+colnames(models.df)[colnames(models.df) == 'data.stations.n.df$mtime'] <- 'Datetime'
+for(i in 1:nrow(models.df)){
+  models.df$Equation[i] <- paste0(round(data.stations.n.df$get.model[[i]][['coefficients']][['(Intercept)']], digits = 4),
+                             " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[2]], digits = 4),
+                             ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[2]],
+                             " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[3]], digits = 4),
+                             ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
+                             )
+  
+  models.df$Residual_SE[i] <- round(as.numeric(summary(data.stations.n.df$get.model[[i]])[['sigma']]), digits = 2)
+}
+models.df$Residual_SE <- as.numeric(models.df$Residual_SE)
+ggplot(models.df, aes(x = Datetime, y = Residual_SE)) +
+  # geom_point() +
+  geom_line() +
+  scale_y_continuous(breaks = round(seq(0,3, by = 0.2)), limits = c(0,3))
 
 # spatialize prediction and error on the grid of Wallonia
 load("./data/expl.static.grid.df.rda") # be careful it is a sf but it is more efficient (::todo:: modify generate independent variables)
@@ -204,13 +224,16 @@ spatialized.tsa_error.sp <- as(spatialized.tsa_error.sf, "Spatial") %>%
   as(., "SpatialGridDataFrame")
 spatialized.tsa_error.df <- as.data.frame(spatialized.tsa_error.sp)
 
-ggmap <- static.ggmap(gridded.data.df =spatialized.tsa_error.df,
+ggmap <- build.static.ggmap(gridded.data.df =spatialized.tsa_error.df,
              boundaries.sf = boundaries.sf,
              layer.error.bool = T,
              legend.error.bool = F,
              pretty_breaks.bool = T,
              title.chr = "Interpolated temperature with multiple linear regression - 2018-05-02 14:00:00",
-             target.chr = "tsa")
+             target.chr = "response",
+             legend.chr = "test",
+             nb_classes.num = 10,
+             reverse_pal.bool = TRUE)
 ggmap
 
 ### Investigation clc
