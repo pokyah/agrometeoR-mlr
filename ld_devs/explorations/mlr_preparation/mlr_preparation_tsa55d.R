@@ -1,5 +1,5 @@
 source("./R/file_management.R")
-source_files_recursively.fun("./R")
+# source_files_recursively.fun("./R")
 source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
 source_files_recursively.fun("./ld_devs/explorations/solar_irradiance/R")
 
@@ -102,9 +102,9 @@ resampling.l = mlr::makeResampleDesc(
 # we also have the option to use an automatic feature selector by fusing it to the learner (see mlr doc).
 # defining the learner who will be used by taking the one with the lowest RMSE from the bmr experiment
 
-bmr.w.l <- benchmark(
-  learners = lrns.l,
-    tasks = data.stations.n.df$tasks,
+bmr.l <- benchmark(
+  learners = lrn,
+    tasks = data.stations.n.df$filtered_tasks,
     # list(data.stations.n.df$alt.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
     #      data.stations.n.df$ens.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
     #          data.stations.n.df$alt.ens.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
@@ -155,20 +155,20 @@ data.stations.n.df <- data.stations.n.df %>%
 models.df <- as.data.frame(data.stations.n.df$mtime)
 colnames(models.df)[colnames(models.df) == 'data.stations.n.df$mtime'] <- 'Datetime'
 for(i in 1:nrow(models.df)){
-  models.df$Equation[i] <- paste0(round(data.stations.n.df$get.model[[i]][['coefficients']][['(Intercept)']], digits = 4),
+  models.df$Equation[i] <- paste0("T = ", round(data.stations.n.df$get.model[[i]][['coefficients']][['(Intercept)']], digits = 4),
                              " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[2]], digits = 4),
                              ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[2]],
                              " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[3]], digits = 4),
                              ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
                              )
-  
   models.df$Residual_SE[i] <- round(as.numeric(summary(data.stations.n.df$get.model[[i]])[['sigma']]), digits = 2)
 }
 models.df$Residual_SE <- as.numeric(models.df$Residual_SE)
 ggplot(models.df, aes(x = Datetime, y = Residual_SE)) +
   # geom_point() +
   geom_line() +
-  scale_y_continuous(breaks = round(seq(0,3, by = 0.2)), limits = c(0,3))
+  scale_y_continuous(breaks = round(seq(0,3, by = 0.2),1), limits = c(0,3)) +
+  scale_x_datetime(date_breaks = "5 days")
 
 # spatialize prediction and error on the grid of Wallonia
 load("./data/expl.static.grid.df.rda") # be careful it is a sf but it is more efficient (::todo:: modify generate independent variables)
