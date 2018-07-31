@@ -30,7 +30,7 @@ colnames(dssf.df) <- c("mhour", "ens", "sid", "lat", "lon")
 stations_meta.df <- dssf.l$references$stations
 # Group in a list
 dssf_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = dssf.df)
-dssf.df <- prepare_agromet_API_data.fun(dssf_and_stations_meta.l, "get_rawdata_dssf")
+dssf.df <- prepare_agromet_API_data.fun(dssf_and_stations_meta.l, "get_rawdata_dssf")
 
 # get tsa and ens records from API
 records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsaForallFm2015-11-11To2018-06-30.json")
