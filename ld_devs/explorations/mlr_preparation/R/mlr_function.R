@@ -8,7 +8,16 @@
 #' @param filter_abs.num A numeric which specifies how many top scoring features you want to select
 #' @return a nested dataframe with data and tasks for every hour
 #' @export
-make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_drop.chr, filter_method.chr, filter_abs.num){
+make.benchmark.tasks <- function(
+  static.vars,
+  dynamic.vars,
+  target.chr,
+  feat_to_drop.chr,
+  filter_method.chr,
+  filter_abs.num = NULL,
+  filter_thr.num = NULL,
+  mandatory.feat.chr = NULL
+  ){
   
   data.sf <- st_join(static.vars, dynamic.vars)
   
@@ -66,7 +75,8 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
     mlr::filterFeatures,
     method = filter_method.chr,
     abs = filter_abs.num,
-    mandatory.feat = "ens"
+    threshold = filter_thr.num,
+    mandatory.feat = mandatory.feat.chr
   )
   
   return(data.stations.n.df)

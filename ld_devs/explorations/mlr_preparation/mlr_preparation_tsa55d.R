@@ -45,7 +45,7 @@ colnames(records.stations.df)[2] <- "gid"
 # Preparing for spatial join of dynamic and static expl vars
 records.stations.sf <- st_as_sf(records.stations.df, coords = c("longitude", "latitude"))
 st_crs(records.stations.sf) <- "+proj=longlat +datum=WGS84 +no_defs"
-lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
 records.stations.sf <- st_transform(records.stations.sf, crs = lambert2008.crs)
 records.stations.sf <- dplyr::bind_cols(records.stations.sf, data.frame(sf::st_coordinates(records.stations.sf)))
 
@@ -162,6 +162,8 @@ for(i in 1:nrow(models.df)){
                              ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
                              )
   models.df$Residual_SE[i] <- round(as.numeric(summary(data.stations.n.df$get.model[[i]])[['sigma']]), digits = 2)
+  models.df$Var1[i] <- names(data.stations.n.df$get.model[[i]][['coefficients']])[[2]]
+  models.df$Var2[i] <- names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
 }
 models.df$Residual_SE <- as.numeric(models.df$Residual_SE)
 ggplot(models.df, aes(x = Datetime, y = Residual_SE)) +
