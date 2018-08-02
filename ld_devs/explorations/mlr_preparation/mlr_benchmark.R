@@ -10,30 +10,10 @@ library(sf)
 library(mlr)
 library(plotly)
 library(jsonlite)
-
-### get records from API and solar irradiance from dssf
-# get dssf records
-dssf.l <- jsonlite::fromJSON("")
-dssf.df <- dssf.l$features
-
-# make each feature properties a list element
-date_ens.l <- dssf.df$properties
-date_ens.l <- purrr::imap(date_ens.l, function(x, sid) cbind(x, sid))
-coords.l <- dssf.df$geometry$coordinates
-coords.l <- lapply(coords.l, function(x) as.data.frame(t(x)))
-coords.l <- purrr::imap(coords.l, function(x, sid) cbind(x, sid))
-# join each feature coordinates + properties
-# https://stackoverflow.com/questions/44703738/merge-two-lists-of-dataframes
-dssf.df <- purrr::map2_df(date_ens.l, coords.l, dplyr::left_join, by="sid")
-colnames(dssf.df) <- c("mhour", "ens", "sid", "lat", "lon")
-# Create a dataframe for the stations meta-information
-stations_meta.df <- dssf.l$references$stations
-# Group in a list
-dssf_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = dssf.df)
-dssf.df <- prepare_agromet_API_data.fun(dssf_and_stations_meta.l, "get_rawdata_dssf")
+library(RColorBrewer)
 
 # get tsa and ens records from API
-records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsaForallFm2015-11-11To2018-06-30.json")
+records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json")
 records.df <- records.l$results
 stations_meta.df <- records.l$references$stations
 records_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = records.df)
@@ -46,7 +26,6 @@ records.stations.df <- records.stations.df %>%
   filter(state == "Ok") %>%
   filter(!is.na(tsa)) %>%
   filter(!is.na(ens))
-
 # Selecting only the useful features
 records.stations.df <- records.stations.df %>%
   dplyr::select("mtime", "sid", "ens", "longitude", "latitude", "tsa")
@@ -76,20 +55,16 @@ data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf
 
 # defining the learner
 # lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
-lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt"), fw.method = "linear.correlation", fw.mandatory.feat = "altitude", fw.abs = 1),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 1),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt.ens"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "altitude"), fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens.herb"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "herbaceous"), fw.abs = 2),
-               makeFilterWrapper(learner = makelearner(cl = "regr.lm", id = "lm.filt.abs2.ens"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs3.ens"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs4.ens"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs5.ens"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 5),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs2"), fw.method = "linear.correlation", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs3"), fw.method = "linear.correlation", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs4"), fw.method = "linear.correlation", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.abs5"), fw.method = "linear.correlation", fw.abs = 5),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.thr05"), fw.method = "linear.correlation", fw.threshold = 0.5),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.filt.thr03"), fw.method = "linear.correlation", fw.threshold = 0.3))
+lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y"), fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y", "altitude"), fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar"), fw.method = "linear.correlation", fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar"), fw.method = "linear.correlation", fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar"), fw.method = "linear.correlation", fw.abs = 4),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5"), fw.method = "linear.correlation", fw.threshold = 0.5),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3"), fw.method = "linear.correlation", fw.threshold = 0.3))
 
 
 # defining the validation (resampling) strategy
@@ -108,28 +83,86 @@ resampling.l = mlr::makeResampleDesc(
 # we also have the option to use an automatic feature selector by fusing it to the learner (see mlr doc).
 # defining the learner who will be used by taking the one with the lowest RMSE from the bmr experiment
 
-bmr.l <- benchmark(
-  learners = lrns.l,
+bmr.Long_Lat.l <- benchmark(
+  learners = lrns.l[1],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = T,
-  show.info = FALSE,
+  keep.pred = F,
+  show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
+save("bmr.Long_Lat.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.l.rda")
+rm("bmr.Long_Lat.l")
+
+bmr.Long_Lat_Elev.l <- benchmark(
+  learners = lrns.l[2],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.Long_Lat_Elev.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat_Elev.l.rda")
+rm("bmr.Long_Lat_Elev.l")
+
+bmr.SolarIrr_1bestVar.l <- benchmark(
+  learners = lrns.l[3],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.SolarIrr_1bestVar.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_1bestVar.l.rda")
+rm("bmr.SolarIrr_1bestVar.l")
+
+bmr.SolarIrr_2bestsVar.l <- benchmark(
+  learners = lrns.l[4],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.SolarIrr_2bestsVar.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_2bestsVar.l.rda")
+rm("bmr.SolarIrr_2bestsVar.l")
+
+bmr.SolarIrr_3bestsVar.l <- benchmark(
+  learners = lrns.l[5],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.SolarIrr_3bestsVar.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_3bestsVar.l.rda")
+rm("bmr.SolarIrr_3bestsVar.l")
+
+
 
 ggplotly(plotBMRSummary(bmr.l, measure = rmse, pointsize = 1, pretty.names = F))
+plotBMRRanksAsBarChart(bmr.l, pretty.names = F)
 
 # computing performances of the benchmark
 perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-
+perfs.methods.aggr.df <- perfs.methods.df %>%
+  group_by(learner.id) %>%
+  summarise(rmse.mean = mean(rmse.test.rmse))
+perfs.methods.aggr.df$learner.id <- substr(perfs.methods.aggr.df$learner.id, start = 1, stop = nchar(as.character(perfs.methods.aggr.df$learner.id))-9)
+ggplot(perfs.methods.aggr.df, aes(x = rmse.mean, y = learner.id)) +
+  geom_point()
 # predicting temperature
 # tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
 # get coefficents from regression model equation
 data.stations.n.df <- data.stations.n.df %>%
   mutate(regr.model = purrr::map(
-    filtered_tasks,
+    tasks,
     train,
     learner = lrn[[1]]
   ))
