@@ -83,17 +83,17 @@ resampling.l = mlr::makeResampleDesc(
 # we also have the option to use an automatic feature selector by fusing it to the learner (see mlr doc).
 # defining the learner who will be used by taking the one with the lowest RMSE from the bmr experiment
 
-bmr.Long_Lat.l <- benchmark(
-  learners = lrns.l[1],
-  tasks = data.stations.n.df$tasks,
-  resamplings = resampling.l,
-  keep.pred = F,
-  show.info = T,
-  models = FALSE,
-  measures = list(rmse, mae, timetrain)
-)
-save("bmr.Long_Lat.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.l.rda")
-rm("bmr.Long_Lat.l")
+# bmr.Long_Lat.l <- benchmark(
+#   learners = lrns.l[1],
+#   tasks = data.stations.n.df$tasks,
+#   resamplings = resampling.l,
+#   keep.pred = F,
+#   show.info = T,
+#   models = FALSE,
+#   measures = list(rmse, mae, timetrain)
+# )
+# save("bmr.Long_Lat.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.l.rda")
+# rm("bmr.Long_Lat.l")
 
 bmr.Long_Lat_Elev.l <- benchmark(
   learners = lrns.l[2],
@@ -104,7 +104,7 @@ bmr.Long_Lat_Elev.l <- benchmark(
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.Long_Lat_Elev.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat_Elev.l.rda")
+save("bmr.Long_Lat_Elev.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat_Elev.l.rda")
 rm("bmr.Long_Lat_Elev.l")
 
 bmr.SolarIrr_1bestVar.l <- benchmark(
@@ -116,7 +116,7 @@ bmr.SolarIrr_1bestVar.l <- benchmark(
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.SolarIrr_1bestVar.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_1bestVar.l.rda")
+save("bmr.SolarIrr_1bestVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_1bestVar.l.rda")
 rm("bmr.SolarIrr_1bestVar.l")
 
 bmr.SolarIrr_2bestsVar.l <- benchmark(
@@ -128,7 +128,7 @@ bmr.SolarIrr_2bestsVar.l <- benchmark(
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.SolarIrr_2bestsVar.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_2bestsVar.l.rda")
+save("bmr.SolarIrr_2bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_2bestsVar.l.rda")
 rm("bmr.SolarIrr_2bestsVar.l")
 
 bmr.SolarIrr_3bestsVar.l <- benchmark(
@@ -140,8 +140,70 @@ bmr.SolarIrr_3bestsVar.l <- benchmark(
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.SolarIrr_3bestsVar.l", "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_3bestsVar.l.rda")
+save("bmr.SolarIrr_3bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_3bestsVar.l.rda")
 rm("bmr.SolarIrr_3bestsVar.l")
+
+bmr.2bestsVar.l <- benchmark(
+  learners = lrns.l[6],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.2bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.2bestsVar.l.rda")
+rm("bmr.2bestsVar.l")
+
+bmr.3bestsVar.l <- benchmark(
+  learners = lrns.l[7],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.3bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.3bestsVar.l.rda")
+rm("bmr.3bestsVar.l")
+
+bmr.4bestsVar.l <- benchmark(
+  learners = lrns.l[8],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.4bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.4bestsVar.l.rda")
+rm("bmr.4bestsVar.l")
+
+bmr.Vars.r05.l <- benchmark(
+  learners = lrns.l[9],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.Vars.r05.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Vars.r05.l.rda")
+rm("bmr.Vars.r05.l")
+
+bmr.Vars.r03.l <- benchmark(
+  learners = lrns.l[10],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.Vars.r03.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Vars.r03.l.rda")
+rm("bmr.Vars.r03.l")
+
+
 
 
 
