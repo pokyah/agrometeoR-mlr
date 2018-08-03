@@ -83,17 +83,17 @@ resampling.l = mlr::makeResampleDesc(
 # we also have the option to use an automatic feature selector by fusing it to the learner (see mlr doc).
 # defining the learner who will be used by taking the one with the lowest RMSE from the bmr experiment
 
-# bmr.Long_Lat.l <- benchmark(
-#   learners = lrns.l[1],
-#   tasks = data.stations.n.df$tasks,
-#   resamplings = resampling.l,
-#   keep.pred = F,
-#   show.info = T,
-#   models = FALSE,
-#   measures = list(rmse, mae, timetrain)
-# )
-# save("bmr.Long_Lat.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.l.rda")
-# rm("bmr.Long_Lat.l")
+bmr.Long_Lat.l <- benchmark(
+  learners = lrns.l[1],
+  tasks = data.stations.n.df$tasks,
+  resamplings = resampling.l,
+  keep.pred = F,
+  show.info = T,
+  models = FALSE,
+  measures = list(rmse, mae, timetrain)
+)
+save("bmr.Long_Lat.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.l.rda")
+rm("bmr.Long_Lat.l")
 
 bmr.Long_Lat_Elev.l <- benchmark(
   learners = lrns.l[2],
@@ -203,21 +203,47 @@ bmr.Vars.r03.l <- benchmark(
 save("bmr.Vars.r03.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Vars.r03.l.rda")
 rm("bmr.Vars.r03.l")
 
-
-
-
-
-ggplotly(plotBMRSummary(bmr.l, measure = rmse, pointsize = 1, pretty.names = F))
-plotBMRRanksAsBarChart(bmr.l, pretty.names = F)
+# ggplotly(plotBMRSummary(bmr.l, measure = rmse, pointsize = 1, pretty.names = F))
+# plotBMRRanksAsBarChart(bmr.l, pretty.names = F)
 
 # computing performances of the benchmark
-perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-perfs.methods.aggr.df <- perfs.methods.df %>%
+perfs.methods.Long_Lat.df <- getBMRAggrPerformances(bmr.Long_Lat.l,as.df = TRUE)
+perfs.methods.Long_Lat_Elev.df <- getBMRAggrPerformances(bmr.Long_Lat_Elev.l,as.df = TRUE)
+perfs.methods.SolarIrr_1bestVar.df <- getBMRAggrPerformances(bmr.SolarIrr_1bestVar.l,as.df = TRUE)
+perfs.methods.SolarIrr_2bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_2bestsVar.l,as.df = TRUE)
+perfs.methods.SolarIrr_3bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_3bestsVar.l,as.df = TRUE)
+perfs.methods.2bestsVar.df <- getBMRAggrPerformances(bmr.2bestsVar.l,as.df = TRUE)
+perfs.methods.3bestsVar.df <- getBMRAggrPerformances(bmr.3bestsVar.l,as.df = TRUE)
+# perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.l,as.df = TRUE)
+# perfs.methods.Vars.r05.df <- getBMRAggrPerformances(bmr.Vars.r05.l,as.df = TRUE)
+# perfs.methods.Vars.r03.df <- getBMRAggrPerformances(bmr.Vars.r03.l,as.df = TRUE)
+
+perfs.methods.df <- bind_rows(perfs.methods.Long_Lat.df, perfs.methods.Long_Lat_Elev.df) %>%
+  bind_rows(., perfs.methods.SolarIrr_1bestVar.df) %>%
+  bind_rows(., perfs.methods.SolarIrr_2bestsVar.df) %>%
+  bind_rows(., perfs.methods.SolarIrr_3bestsVar.df) %>%
+  bind_rows(., perfs.methods.2bestsVar.df) %>%
+  bind_rows(., perfs.methods.3bestsVar.df) #%>%
+  # bind_rows(., perfs.methods.4bestsVar.df) %>%
+  # bind_rows(., perfs.methods.Vars.r05.df) %>%
+  # bind_rows(., perfs.methods.Vars.r03.df)
+
+perfs.methods.aggr.rmse.df <- perfs.methods.df %>%
   group_by(learner.id) %>%
   summarise(rmse.mean = mean(rmse.test.rmse))
-perfs.methods.aggr.df$learner.id <- substr(perfs.methods.aggr.df$learner.id, start = 1, stop = nchar(as.character(perfs.methods.aggr.df$learner.id))-9)
-ggplot(perfs.methods.aggr.df, aes(x = rmse.mean, y = learner.id)) +
-  geom_point()
+perfs.methods.aggr.mae.df <- perfs.methods.df %>%
+  group_by(learner.id) %>%
+  summarise(mae.mean = mean(mae.test.mean))
+perfs.methods.aggr.df <- left_join(perfs.methods.aggr.rmse.df, perfs.methods.aggr.mae.df, by = "learner.id")
+perfs.methods.aggr.df$learner.id <- substr(perfs.methods.aggr.df$learner.id, 
+                                           start = 1, 
+                                           stop = nchar(as.character(perfs.methods.aggr.df$learner.id))-9)
+
+ggplot(perfs.methods.aggr.df, aes(y = reorder(learner.id, -mae.mean, sum))) +
+  geom_point(aes(x = rmse.mean, color = "RMSE")) +
+  geom_point(aes(x = mae.mean, color = "MAE")) +
+  scale_x_continuous(breaks = seq(0.7, 1.3, by = 0.1), limits = c(0.7, 1.2)) +
+  labs(x = "Values", y= "Learners", color = "Error")
 # predicting temperature
 # tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
@@ -226,7 +252,7 @@ data.stations.n.df <- data.stations.n.df %>%
   mutate(regr.model = purrr::map(
     tasks,
     train,
-    learner = lrn[[1]]
+    learner = lrns.l[[6]]
   ))
 data.stations.n.df <- data.stations.n.df %>%
   mutate(get.model = purrr::map(
@@ -238,21 +264,15 @@ data.stations.n.df <- data.stations.n.df %>%
 models.df <- as.data.frame(data.stations.n.df$mtime)
 colnames(models.df)[colnames(models.df) == 'data.stations.n.df$mtime'] <- 'Datetime'
 for(i in 1:nrow(models.df)){
-  models.df$Equation[i] <- paste0("T = ", round(data.stations.n.df$get.model[[i]][['coefficients']][['(Intercept)']], digits = 4),
-                                  " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[2]], digits = 4),
-                                  ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[2]],
-                                  " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[3]], digits = 4),
-                                  ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
+  models.df$Equation[i] <- paste0("T = ", round(as.numeric(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']][['(Intercept)']]), digits = 6),
+                                  " + ", round(as.numeric(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']][[2]]), digits = 6),
+                                  ".", names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[2]],
+                                  " + ", round(as.numeric(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']][[3]]), digits = 6),
+                                  ".", names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[3]]
   )
-  models.df$Residual_SE[i] <- round(as.numeric(summary(data.stations.n.df$get.model[[i]])[['sigma']]), digits = 2)
+  models.df$BestVar1[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[2]]
+  models.df$BestVar2[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[3]]
 }
-models.df$Residual_SE <- as.numeric(models.df$Residual_SE)
-ggplot(models.df, aes(x = Datetime, y = Residual_SE)) +
-  # geom_point() +
-  geom_line() +
-  scale_y_continuous(breaks = round(seq(0,3, by = 0.2),1), limits = c(0,3)) +
-  scale_x_datetime(date_breaks = "5 days")
-
 
 ### spatialize prediction and error on the grid of Wallonia
 load("./data/expl.static.grid.df.rda") # be careful it is a sf but it is more efficient (::todo:: modify generate independent variables)
