@@ -68,7 +68,7 @@ dssf.160101_160630.df$ens <- as.numeric(gsub(",", ".", gsub("\\.", "", dssf.1601
 dssf.160701_161231.df$ens <- as.numeric(gsub(",", ".", gsub("\\.", "", dssf.160701_161231.df$ens)))
 dssf.170101_170630.df$ens <- as.numeric(gsub(",", ".", gsub("\\.", "", dssf.170101_170630.df$ens)))
 dssf.170701_171231.df$ens <- as.numeric(gsub(",", ".", gsub("\\.", "", dssf.170701_171231.df$ens)))
-dssf.180101_180630.df$ens <- as.numeric(gsub(",", ".", gsub("\\.", "", dssf.180101_180630.df$ens)))
+dssf.180101_180630.df$ens <- as.numeric(dssf.180101_180630.df$ens)
 
 dssf.151111_151231.n.df <- dssf.151111_151231.df %>%
   group_by(mhour) %>%

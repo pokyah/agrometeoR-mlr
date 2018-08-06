@@ -80,14 +80,19 @@ table.dssf.df <- table(dssf.records.df$mhour)
 dssf.records.df <- dssf.records.df %>%
   filter(mhour >= "2016-01-01 00:00:00" & mhour <= "2018-06-01 00:00:00") %>%
   filter(mhour != "2017-12-31" & mhour != "2017-06-30") %>%
-  filter(mhour %in% as.POSIXct(table.stations.df$Var1))
+  filter(mhour %in% as.POSIXct(table.stations.df$Var1)) %>%
+  filter(sid == 476)
 records.stations.df <- records.stations.df %>%
   filter(mtime >= "2016-01-01 00:00:00" & mtime <= "2018-06-01 00:00:00") %>%
-  filter(mtime %in% dssf.records.df$mhour)
+  filter(mtime %in% dssf.records.df$mhour) %>%
+  filter(gid == 15)
 
-
-
+# couple correlation
 cor(dssf.records.df$ens, records.stations.df$ens, use = "na.or.complete")
-
-
+# 25/396 : 0.9557991 ; 23/552 : 0.953246 ; 24/499 : 0.9272308 ; 42/330 : 0.955108 ; 14/443 : 0.945988
+# 35/378 : 0.9517486 ; 33/77 : 0.9555424 ; 30/132 : 0.9575363 ; 32/259 : 0.9578885 ; 26/254 : 0.958013
+# 39/62 : 0.9547781 ; 18/58 : 0.9583265 ; 40/180 : 0.9475031 ; 27/247 : 0.9440548 ; 19/307 : 0.954955
+# 34/239 : 0.956161 ; 38/154 : 0.962355 ; 37/465 : 0.9422871 ; 15/476 : 0.9514156 ; 13/644 : 0.958661
+# 61/580 : 0.9343718 ; 17/624 : 0.9578254 ; 41/746 : 0.9301199 ; 10/705 : 0.9562283 ; 9/711 : 0.9510065
+# 1/756 : 0.9438328 ; 4/840 : 0.9581045 ; 7/838 : 0.9515559 ; 29/875 : 0.9614241
 
