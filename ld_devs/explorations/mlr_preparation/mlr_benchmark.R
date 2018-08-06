@@ -216,8 +216,8 @@ perfs.methods.SolarIrr_3bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_3best
 perfs.methods.2bestsVar.df <- getBMRAggrPerformances(bmr.2bestsVar.l,as.df = TRUE)
 perfs.methods.3bestsVar.df <- getBMRAggrPerformances(bmr.3bestsVar.l,as.df = TRUE)
 perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.l,as.df = TRUE)
-# perfs.methods.Vars.r05.df <- getBMRAggrPerformances(bmr.Vars.r05.l,as.df = TRUE)
-# perfs.methods.Vars.r03.df <- getBMRAggrPerformances(bmr.Vars.r03.l,as.df = TRUE)
+perfs.methods.Vars.r05.df <- getBMRAggrPerformances(bmr.Vars.r05.l,as.df = TRUE)
+perfs.methods.Vars.r03.df <- getBMRAggrPerformances(bmr.Vars.r03.l,as.df = TRUE)
 
 perfs.methods.df <- bind_rows(perfs.methods.Long_Lat.df, perfs.methods.Long_Lat_Elev.df) %>%
   bind_rows(., perfs.methods.SolarIrr_1bestVar.df) %>%
@@ -225,9 +225,9 @@ perfs.methods.df <- bind_rows(perfs.methods.Long_Lat.df, perfs.methods.Long_Lat_
   bind_rows(., perfs.methods.SolarIrr_3bestsVar.df) %>%
   bind_rows(., perfs.methods.2bestsVar.df) %>%
   bind_rows(., perfs.methods.3bestsVar.df) %>%
-  bind_rows(., perfs.methods.4bestsVar.df) #%>%
-  # bind_rows(., perfs.methods.Vars.r05.df) %>%
-  # bind_rows(., perfs.methods.Vars.r03.df)
+  bind_rows(., perfs.methods.4bestsVar.df) %>%
+  bind_rows(., perfs.methods.Vars.r05.df) %>%
+  bind_rows(., perfs.methods.Vars.r03.df)
 
 perfs.methods.aggr.rmse.df <- perfs.methods.df %>%
   group_by(learner.id) %>%
@@ -273,6 +273,9 @@ for(i in 1:nrow(models.df)){
   )
   models.df$BestVar1[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[2]]
   models.df$BestVar2[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[3]]
+  
+  models.df$RMSE <- perfs.methods.2bestsVar.df$rmse.test.rmse
+  models.df$MAE <- perfs.methods.2bestsVar.df$mae.test.mean
 }
 
 ### spatialize prediction and error on the grid of Wallonia
@@ -288,15 +291,16 @@ grid.1000.pt.sp <- build.vs.grid.fun(
 )
 
 # get ens on virtual grid
-dssf.n.df <- dssf.170101_170630.df %>%
+load("./data/dssf.180101_180630.df.rda")
+dssf.n.df <- dssf.180101_180630.df %>%
   group_by(mhour) %>%
   nest()
-dssf.pred.df <- build.dssf.hour(dssf.n.df, "2017-05-02 14:00:00", grid.1000.pt.sp)
+dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-01-12 08:00:00", grid.1000.pt.sp)
 # add ens variable to prediction grid
 expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
-                                       learner.id.chr = "lm.Long_Lat_Elev",
-                                       task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2017-05-02 14:00:00')]],
+                                       learner.id.chr = "lm.2bestsVar",
+                                       task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2018-01-12 08:00:00')]],
                                        prediction_grid.df = expl.static.grid.df,
                                        predict.type = "se"
 ) %>%
