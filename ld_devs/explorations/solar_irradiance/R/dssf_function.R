@@ -14,7 +14,7 @@ build.dssf.hour <- function(dssf.nested.df, hour.chr, grid.pt.sp) {
   dssf.hour.df <- subset(dssf.nested.df, mhour == hour.chr)
   
   dssf.hour.sp <- dssf.hour.df$data[[1]]
-  sp::coordinates(dssf.hour.sp) <- ~long+lat
+  sp::coordinates(dssf.hour.sp) <- ~lat+lon
   # set crs lambert 2008
   raster::crs(dssf.hour.sp) <- "+proj=longlat +datum=WGS84 +no_defs"
   dssf.hour.sp <- sp::spTransform(dssf.hour.sp,

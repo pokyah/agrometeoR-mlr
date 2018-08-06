@@ -203,7 +203,8 @@ bmr.Vars.r03.l <- benchmark(
 save("bmr.Vars.r03.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Vars.r03.l.rda")
 rm("bmr.Vars.r03.l")
 
-# ggplotly(plotBMRSummary(bmr.l, measure = rmse, pointsize = 1, pretty.names = F))
+ggplotly(plotBMRSummary(bmr.2bestsVar.l, measure = rmse, pointsize = 1, pretty.names = F) +
+           plotBMRSummary(bmr.Long_Lat_Elev.l, measure = rmse, pointsize = 1, pretty.names = F))
 # plotBMRRanksAsBarChart(bmr.l, pretty.names = F)
 
 # computing performances of the benchmark
@@ -214,7 +215,7 @@ perfs.methods.SolarIrr_2bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_2best
 perfs.methods.SolarIrr_3bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_3bestsVar.l,as.df = TRUE)
 perfs.methods.2bestsVar.df <- getBMRAggrPerformances(bmr.2bestsVar.l,as.df = TRUE)
 perfs.methods.3bestsVar.df <- getBMRAggrPerformances(bmr.3bestsVar.l,as.df = TRUE)
-# perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.l,as.df = TRUE)
+perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.l,as.df = TRUE)
 # perfs.methods.Vars.r05.df <- getBMRAggrPerformances(bmr.Vars.r05.l,as.df = TRUE)
 # perfs.methods.Vars.r03.df <- getBMRAggrPerformances(bmr.Vars.r03.l,as.df = TRUE)
 
@@ -223,8 +224,8 @@ perfs.methods.df <- bind_rows(perfs.methods.Long_Lat.df, perfs.methods.Long_Lat_
   bind_rows(., perfs.methods.SolarIrr_2bestsVar.df) %>%
   bind_rows(., perfs.methods.SolarIrr_3bestsVar.df) %>%
   bind_rows(., perfs.methods.2bestsVar.df) %>%
-  bind_rows(., perfs.methods.3bestsVar.df) #%>%
-  # bind_rows(., perfs.methods.4bestsVar.df) %>%
+  bind_rows(., perfs.methods.3bestsVar.df) %>%
+  bind_rows(., perfs.methods.4bestsVar.df) #%>%
   # bind_rows(., perfs.methods.Vars.r05.df) %>%
   # bind_rows(., perfs.methods.Vars.r03.df)
 
@@ -287,15 +288,15 @@ grid.1000.pt.sp <- build.vs.grid.fun(
 )
 
 # get ens on virtual grid
-dssf.n.df <- dssf.0103_3105.df %>%
+dssf.n.df <- dssf.170101_170630.df %>%
   group_by(mhour) %>%
   nest()
-dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-05-02 14:00:00", grid.1000.pt.sp)
+dssf.pred.df <- build.dssf.hour(dssf.n.df, "2017-05-02 14:00:00", grid.1000.pt.sp)
 # add ens variable to prediction grid
 expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
-                                       learner.id.chr = "linear regression",
-                                       task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
+                                       learner.id.chr = "lm.Long_Lat_Elev",
+                                       task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2017-05-02 14:00:00')]],
                                        prediction_grid.df = expl.static.grid.df,
                                        predict.type = "se"
 ) %>%
@@ -315,16 +316,18 @@ spatialized.tsa_error.sp <- as(spatialized.tsa_error.sf, "Spatial") %>%
   as(., "SpatialGridDataFrame")
 spatialized.tsa_error.df <- as.data.frame(spatialized.tsa_error.sp)
 
-ggmap <- build.static.ggmap(gridded.data.df =spatialized.tsa_error.df,
+ggmap <- build.static.ggmap(gridded.data.df = spatialized.tsa_error.df,
                             boundaries.sf = boundaries.sf,
                             layer.error.bool = T,
                             legend.error.bool = F,
                             pretty_breaks.bool = T,
-                            title.chr = "Interpolated temperature with multiple linear regression - 2018-05-02 14:00:00",
+                            title.chr = "Interpolated temperature with lm",
+                            legend.chr = "Temperature",
                             target.chr = "response",
-                            legend.chr = "test",
+                            target.name = "temp",
                             nb_classes.num = 10,
-                            reverse_pal.bool = TRUE)
+                            reverse_pal.bool = T,
+                            resolution.chr = "Resolution : 1 km²")
 ggmap
 
 
