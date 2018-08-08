@@ -10,17 +10,17 @@ load("./data/stations_meta.df.rda")
 
 # filter stations meta
 stations_meta.df <- stations_meta.df %>%
-  select(sid, poste, longitude, latitude, altitude, network_name, state, type_name) %>%
+  dplyr::select(sid, poste, longitude, latitude, altitude, network_name, state, type_name) %>%
   filter(network_name == "pameseb") %>%
   filter(type_name != "Sencrop") %>%
   filter(state == "Ok") %>%
   filter(sid != 36) %>%
-  select(sid, longitude, latitude)
+  dplyr::select(sid, longitude, latitude)
 stations_meta.df$longitude <- as.numeric(stations_meta.df$longitude)
 stations_meta.df$latitude <- as.numeric(stations_meta.df$latitude)
 
 # reduce size records deleting column
-records.stations.df <- records.stations.df %>% select(-tsa)
+records.stations.df <- records.stations.df %>% dplyr::select(-tsa)
 
 # sf stations meta
 stations_meta.sf <- st_as_sf(stations_meta.df, coords = c("longitude", "latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs")
@@ -61,7 +61,7 @@ dssf.180101_180630.df <- dssf.180101_180630.df %>%
 
 # # check nearest points from stations
 # dssf.sid.sf <- dssf.151111_151231.sf %>%
-  # select(sid, geometry)
+# select(sid, geometry)
 # dssf.sid.sf <- dssf.sid.sf[!duplicated(dssf.sid.sf),]
 # mapview(dssf.sid.sf) + stations_meta.sf
 
@@ -80,19 +80,25 @@ table.dssf.df <- table(dssf.records.df$mhour)
 dssf.records.df <- dssf.records.df %>%
   filter(mhour >= "2016-01-01 00:00:00" & mhour <= "2018-06-01 00:00:00") %>%
   filter(mhour != "2017-12-31" & mhour != "2017-06-30") %>%
-  filter(mhour %in% as.POSIXct(table.stations.df$Var1)) %>%
-  filter(sid == 476)
+  filter(mhour %in% as.POSIXct(table.stations.df$Var1))
 records.stations.df <- records.stations.df %>%
   filter(mtime >= "2016-01-01 00:00:00" & mtime <= "2018-06-01 00:00:00") %>%
-  filter(mtime %in% dssf.records.df$mhour) %>%
-  filter(gid == 15)
+  filter(mtime %in% dssf.records.df$mhour)
 
+order <- c(756, 840, 838, 711, 705, 644, 443, 476, 624, 58, 307, 552, 499, 396, 
+           254, 247, 875, 132, 259, 77, 239, 378, 465, 154, 62, 180, 746, 330, 580)
+dssf.records.df <- dssf.records.df[match(order, dssf.records.df$sid),]
 # couple correlation
 cor(dssf.records.df$ens, records.stations.df$ens, use = "na.or.complete")
-# 25/396 : 0.9557991 ; 23/552 : 0.953246 ; 24/499 : 0.9272308 ; 42/330 : 0.955108 ; 14/443 : 0.945988
-# 35/378 : 0.9517486 ; 33/77 : 0.9555424 ; 30/132 : 0.9575363 ; 32/259 : 0.9578885 ; 26/254 : 0.958013
-# 39/62 : 0.9547781 ; 18/58 : 0.9583265 ; 40/180 : 0.9475031 ; 27/247 : 0.9440548 ; 19/307 : 0.954955
-# 34/239 : 0.956161 ; 38/154 : 0.962355 ; 37/465 : 0.9422871 ; 15/476 : 0.9514156 ; 13/644 : 0.958661
-# 61/580 : 0.9343718 ; 17/624 : 0.9578254 ; 41/746 : 0.9301199 ; 10/705 : 0.9562283 ; 9/711 : 0.9510065
-# 1/756 : 0.9438328 ; 4/840 : 0.9581045 ; 7/838 : 0.9515559 ; 29/875 : 0.9614241
-
+correlations.df <- data.frame(couple.id_station.id_pix = c('25/396', '23/552', '24/499', '42/330', '14/443', '35/378', '33/77',
+                                         '30/132', '32/259', '26/254', '39/62', '18/58', '40/180', '27/247',
+                                         '19/307', '34/239', '38/154', '37/465', '15/476', '13/644', '61/580',
+                                         '17/624', '41/746', '10/705', '9/711', '1/756', '4/840', '7/838',
+                                         '29/875'),
+                              correlation = c(0.9557991, 0.953246, 0.9272308, 0.955108, 0.945988,
+                                              0.9517486, 0.9555424, 0.9575363, 0.9578885, 0.958013,
+                                              0.9547781, 0.9583265, 0.9475031, 0.9440548, 0.954955,
+                                              0.956161, 0.962355, 0.9422871, 0.9514156, 0.958661,
+                                              0.9343718, 0.9578254, 0.9301199, 0.9562283, 0.9510065,
+                                              0.9438328, 0.9581045, 0.9515559, 0.9614241))
+mean(correlations.df$correlation)
