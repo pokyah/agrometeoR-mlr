@@ -12,7 +12,7 @@ library(plotly)
 library(jsonlite)
 library(RColorBrewer)
 
-# get tsa and ens records from API
+# get tsa and ens records from AGROMET API
 records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json")
 records.df <- records.l$results
 stations_meta.df <- records.l$references$stations
@@ -55,16 +55,16 @@ data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf
 
 # defining the learner
 # lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
-lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y"), fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y", "altitude"), fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar"), fw.method = "linear.correlation", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar"), fw.method = "linear.correlation", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar"), fw.method = "linear.correlation", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5"), fw.method = "linear.correlation", fw.threshold = 0.5),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3"), fw.method = "linear.correlation", fw.threshold = 0.3))
+lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat", predict.type = "se"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y"), fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev", predict.type = "se"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y", "altitude"), fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar", predict.type = "se"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar", predict.type = "se"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar", predict.type = "se"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar", predict.type = "se"), fw.method = "linear.correlation", fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar", predict.type = "se"), fw.method = "linear.correlation", fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar", predict.type = "se"), fw.method = "linear.correlation", fw.abs = 4),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5", predict.type = "se"), fw.method = "linear.correlation", fw.threshold = 0.5),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3", predict.type = "se"), fw.method = "linear.correlation", fw.threshold = 0.3))
 
 
 # defining the validation (resampling) strategy
@@ -83,107 +83,109 @@ resampling.l = mlr::makeResampleDesc(
 # we also have the option to use an automatic feature selector by fusing it to the learner (see mlr doc).
 # defining the learner who will be used by taking the one with the lowest RMSE from the bmr experiment
 
-bmr.Long_Lat.l <- benchmark(
+# bmr are heavy : 1,3 GB if keep pred = TRUE, try to save objects and remove from environment to avoid crash
+
+bmr.Long_Lat.p.l <- benchmark(
   learners = lrns.l[1],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T, # to merge benchmarks results you need to keep pred
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.Long_Lat.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.l.rda")
-rm("bmr.Long_Lat.l")
+save("bmr.Long_Lat.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat.p.l.rda")
+rm("bmr.Long_Lat.p.l")
 
-bmr.Long_Lat_Elev.l <- benchmark(
+bmr.Long_Lat_Elev.p.l <- benchmark(
   learners = lrns.l[2],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.Long_Lat_Elev.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat_Elev.l.rda")
-rm("bmr.Long_Lat_Elev.l")
+save("bmr.Long_Lat_Elev.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Long_Lat_Elev.p.l.rda")
+rm("bmr.Long_Lat_Elev.p.l")
 
-bmr.SolarIrr_1bestVar.l <- benchmark(
+bmr.SolarIrr_1bestVar.p.l <- benchmark(
   learners = lrns.l[3],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.SolarIrr_1bestVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_1bestVar.l.rda")
-rm("bmr.SolarIrr_1bestVar.l")
+save("bmr.SolarIrr_1bestVar.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_1bestVar.p.l.rda")
+rm("bmr.SolarIrr_1bestVar.p.l")
 
-bmr.SolarIrr_2bestsVar.l <- benchmark(
+bmr.SolarIrr_2bestsVar.p.l <- benchmark(
   learners = lrns.l[4],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.SolarIrr_2bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_2bestsVar.l.rda")
-rm("bmr.SolarIrr_2bestsVar.l")
+save("bmr.SolarIrr_2bestsVar.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_2bestsVar.p.l.rda")
+rm("bmr.SolarIrr_2bestsVar.p.l")
 
-bmr.SolarIrr_3bestsVar.l <- benchmark(
+bmr.SolarIrr_3bestsVar.p.l <- benchmark(
   learners = lrns.l[5],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.SolarIrr_3bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_3bestsVar.l.rda")
-rm("bmr.SolarIrr_3bestsVar.l")
+save("bmr.SolarIrr_3bestsVar.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.SolarIrr_3bestsVar.p.l.rda")
+rm("bmr.SolarIrr_3bestsVar.p.l")
 
-bmr.2bestsVar.l <- benchmark(
+bmr.2bestsVar.p.l <- benchmark(
   learners = lrns.l[6],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.2bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.2bestsVar.l.rda")
-rm("bmr.2bestsVar.l")
+save("bmr.2bestsVar.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.2bestsVar.p.l.rda")
+rm("bmr.2bestsVar.p.l")
 
-bmr.3bestsVar.l <- benchmark(
+bmr.3bestsVar.p.l <- benchmark(
   learners = lrns.l[7],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.3bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.3bestsVar.l.rda")
-rm("bmr.3bestsVar.l")
+save("bmr.3bestsVar.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.3bestsVar.p.l.rda")
+rm("bmr.3bestsVar.p.l")
 
-bmr.4bestsVar.l <- benchmark(
+bmr.4bestsVar.p.l <- benchmark(
   learners = lrns.l[8],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = T,
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
 )
-save("bmr.4bestsVar.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.4bestsVar.l.rda")
-rm("bmr.4bestsVar.l")
+save("bmr.4bestsVar.p.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.4bestsVar.p.l.rda")
+rm("bmr.4bestsVar.p.l")
 
 bmr.Vars.r05.l <- benchmark(
   learners = lrns.l[9],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = F, # keed pred returns error...
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
@@ -195,7 +197,7 @@ bmr.Vars.r03.l <- benchmark(
   learners = lrns.l[10],
   tasks = data.stations.n.df$tasks,
   resamplings = resampling.l,
-  keep.pred = F,
+  keep.pred = F, # keep pred returns error
   show.info = T,
   models = FALSE,
   measures = list(rmse, mae, timetrain)
@@ -203,11 +205,21 @@ bmr.Vars.r03.l <- benchmark(
 save("bmr.Vars.r03.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Vars.r03.l.rda")
 rm("bmr.Vars.r03.l")
 
-ggplotly(plotBMRSummary(bmr.2bestsVar.l, measure = rmse, pointsize = 1, pretty.names = F) +
-           plotBMRSummary(bmr.Long_Lat_Elev.l, measure = rmse, pointsize = 1, pretty.names = F))
-# plotBMRRanksAsBarChart(bmr.l, pretty.names = F)
+# merge beanchmark results, hard to merge more than 5 benchmark results !
+bmrs.l <- mergeBenchmarkResults(list(bmr.Long_Lat_Elev.p.l, bmr.SolarIrr_2bestsVar.p.l, bmr.2bestsVar.p.l))
+
+# plotBMRSummary(bmrs.l, measure = rmse, pointsize = 0.01, pretty.names = F) # 23089 tasks -> unreadable
+# barchart displaying the number of times where each methods has rank 1 to 3 to compare performances
+plotBMRRanksAsBarChart(bmrs.l, pos = "dodge", pretty.names = F) +
+  ggtitle("Comparison of methods by their ranks") +
+  scale_y_continuous(breaks = seq(0,14000,by = 2000), limits = c(0, 14000)) +
+  scale_fill_discrete(labels = c("lm.2bestsVar", "lm.Long.Lat.Elev", "lm.SolarIrr+2bestsVar"), name = "Method") +
+  labs(x = "Rank", y = "Number of times")
 
 # computing performances of the benchmark
+# bmrs.l <- c(bmr.Long_Lat.l, bmr.Long_Lat_Elev.l, bmr.SolarIrr_1bestVar.l, bmr.SolarIrr_2bestsVar.l,
+#             bmr.SolarIrr_3bestsVar.l, bmr.2bestsVar.l, bmr.3bestsVar.l, bmr.4bestsVar.l, bmr.Vars.r05.l, bmr.Vars.r03.l)
+# perfs.methods.l <- lapply(bmrs.l, getBMRAggrPerformances, as.df = TRUE)
 perfs.methods.Long_Lat.df <- getBMRAggrPerformances(bmr.Long_Lat.l,as.df = TRUE)
 perfs.methods.Long_Lat_Elev.df <- getBMRAggrPerformances(bmr.Long_Lat_Elev.l,as.df = TRUE)
 perfs.methods.SolarIrr_1bestVar.df <- getBMRAggrPerformances(bmr.SolarIrr_1bestVar.l,as.df = TRUE)
@@ -219,16 +231,14 @@ perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.l,as.df = TRU
 perfs.methods.Vars.r05.df <- getBMRAggrPerformances(bmr.Vars.r05.l,as.df = TRUE)
 perfs.methods.Vars.r03.df <- getBMRAggrPerformances(bmr.Vars.r03.l,as.df = TRUE)
 
-perfs.methods.df <- bind_rows(perfs.methods.Long_Lat.df, perfs.methods.Long_Lat_Elev.df) %>%
-  bind_rows(., perfs.methods.SolarIrr_1bestVar.df) %>%
-  bind_rows(., perfs.methods.SolarIrr_2bestsVar.df) %>%
-  bind_rows(., perfs.methods.SolarIrr_3bestsVar.df) %>%
-  bind_rows(., perfs.methods.2bestsVar.df) %>%
-  bind_rows(., perfs.methods.3bestsVar.df) %>%
-  bind_rows(., perfs.methods.4bestsVar.df) %>%
-  bind_rows(., perfs.methods.Vars.r05.df) %>%
-  bind_rows(., perfs.methods.Vars.r03.df)
+# aggregate performances of different methods
+perfs.methods.df <- rbind(perfs.methods.Long_Lat.df, perfs.methods.Long_Lat_Elev.df,
+                          perfs.methods.SolarIrr_1bestVar.df, perfs.methods.SolarIrr_2bestsVar.df,
+                          perfs.methods.SolarIrr_3bestsVar.df, perfs.methods.2bestsVar.df,
+                          perfs.methods.3bestsVar.df, perfs.methods.4bestsVar.df,
+                          perfs.methods.Vars.r05.df, perfs.methods.Vars.r03.df)
 
+# summarise performances for each method
 perfs.methods.aggr.rmse.df <- perfs.methods.df %>%
   group_by(learner.id) %>%
   summarise(rmse.mean = mean(rmse.test.rmse))
@@ -236,17 +246,17 @@ perfs.methods.aggr.mae.df <- perfs.methods.df %>%
   group_by(learner.id) %>%
   summarise(mae.mean = mean(mae.test.mean))
 perfs.methods.aggr.df <- left_join(perfs.methods.aggr.rmse.df, perfs.methods.aggr.mae.df, by = "learner.id")
+# make learner id more readable for the graph
 perfs.methods.aggr.df$learner.id <- substr(perfs.methods.aggr.df$learner.id, 
                                            start = 1, 
                                            stop = nchar(as.character(perfs.methods.aggr.df$learner.id))-9)
-
+# visualize the performances
 ggplot(perfs.methods.aggr.df, aes(y = reorder(learner.id, -mae.mean, sum))) +
   geom_point(aes(x = rmse.mean, color = "RMSE")) +
   geom_point(aes(x = mae.mean, color = "MAE")) +
   scale_x_continuous(breaks = seq(0.7, 1.3, by = 0.1), limits = c(0.7, 1.2)) +
-  labs(x = "Values", y= "Learners", color = "Error")
-# predicting temperature
-# tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
+  labs(x = "Values", y = "Learners", color = "Error") +
+  ggtitle("Comparison of methods")
 
 # get coefficents from regression model equation
 data.stations.n.df <- data.stations.n.df %>%
@@ -265,15 +275,18 @@ data.stations.n.df <- data.stations.n.df %>%
 models.df <- as.data.frame(data.stations.n.df$mtime)
 colnames(models.df)[colnames(models.df) == 'data.stations.n.df$mtime'] <- 'Datetime'
 for(i in 1:nrow(models.df)){
+  # equation for the hour
   models.df$Equation[i] <- paste0("T = ", round(as.numeric(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']][['(Intercept)']]), digits = 6),
                                   " + ", round(as.numeric(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']][[2]]), digits = 6),
                                   ".", names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[2]],
                                   " + ", round(as.numeric(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']][[3]]), digits = 6),
                                   ".", names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[3]]
   )
+  # explanatory variables used for the model
   models.df$BestVar1[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[2]]
   models.df$BestVar2[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[3]]
   
+  # error associated to the model
   models.df$RMSE <- perfs.methods.2bestsVar.df$rmse.test.rmse
   models.df$MAE <- perfs.methods.2bestsVar.df$mae.test.mean
 }
@@ -291,22 +304,24 @@ grid.1000.pt.sp <- build.vs.grid.fun(
 )
 
 # get ens on virtual grid
+# load dssf records from the period you want
 load("./data/dssf.180101_180630.df.rda")
 dssf.n.df <- dssf.180101_180630.df %>%
   group_by(mhour) %>%
   nest()
-dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-01-12 08:00:00", grid.1000.pt.sp)
+# spatialize dssf for the hour you want
+dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-05-02 14:00:00", grid.1000.pt.sp)
 # add ens variable to prediction grid
 expl.static.grid.df$ens <- dssf.pred.df$ens.pred
-spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
-                                       learner.id.chr = "lm.2bestsVar",
-                                       task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2018-01-12 08:00:00')]],
-                                       prediction_grid.df = expl.static.grid.df,
-                                       predict.type = "se"
-) %>%
+# spatialize temperature on the grid
+intpol.tsa.sf <- spatialize(regr.lrn = lrns.l[[6]],
+                            task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
+                            prediction_grid.df = expl.static.grid.df,
+                            predict.type = "se"
+                            ) %>%
   dplyr::select(gid, geometry, response, se)
 
-# visualize the map
+## visualize the map
 # get Wallonia boundaries
 boundaries.sp <- raster::getData('GADM', country="BE", level=1, path = "./external-data/Boundaries") %>%
   subset(NAME_1 == "Wallonie")
@@ -314,34 +329,25 @@ boundaries.sp <- spTransform(boundaries.sp, CRSobj = lambert2008.crs)
 boundaries.sf <- st_as_sf(boundaries.sp)
 st_crs(boundaries.sf) <- lambert2008.crs
 
-# prepare data to be visualized (transform from points to polygons and then storing them in a df)
-spatialized.tsa_error.sp <- as(spatialized.tsa_error.sf, "Spatial") %>%
+# prepare data to be visualized (transform from points to grid and then storing them in a df)
+intpol.tsa.sp <- as(intpol.tsa.sf, "Spatial") %>%
   as(., "SpatialPixelsDataFrame") %>%
   as(., "SpatialGridDataFrame")
-spatialized.tsa_error.df <- as.data.frame(spatialized.tsa_error.sp)
+intpol.tsa.df<- as.data.frame(intpol.tsa.sp)
 
-ggmap <- build.static.ggmap(gridded.data.df = spatialized.tsa_error.df,
+# build the map
+ggmap <- build.static.ggmap(gridded.data.df = intpol.tsa.df,
                             boundaries.sf = boundaries.sf,
                             layer.error.bool = T,
                             legend.error.bool = F,
                             pretty_breaks.bool = T,
-                            title.chr = "Interpolated temperature with lm",
-                            legend.chr = "Temperature",
+                            title.chr = "Interpolated temperature with multiple linear regression - 2 bests variables",
+                            legend.chr = "Temperature (°C)",
                             target.chr = "response",
                             target.name = "temp",
                             nb_classes.num = 10,
                             reverse_pal.bool = T,
                             resolution.chr = "Resolution : 1 km²")
 ggmap
-
-
-
-
-
-
-
-
-
-
 
 

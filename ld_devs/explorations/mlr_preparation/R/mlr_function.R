@@ -35,14 +35,14 @@ make.benchmark.tasks <- function(
   # converting each tibble of the nested records to a strict dataframe (required by mlr)
   # ::todo:: need to use transmute_at
   data.stations.n.df <- data.stations.n.df %>%
-    mutate(data_as_df = purrr::map(
+    mutate(data.df = purrr::map(
       .x = data,
       .f = data.frame
     ))
   
   # removing the tibbles columns and only keeping the pure dataframes (required by mlr)
   data.stations.n.df <- data.stations.n.df %>%
-    dplyr::select(mtime, data_as_df)
+    dplyr::select(mtime, data.df)
   
   # defining the regression tasks on the stations observations for each of the hourly datasets
   # https://stackoverflow.com/questions/46868706/failed-to-use-map2-with-mutate-with-purrr-and-dplyr
@@ -50,7 +50,7 @@ make.benchmark.tasks <- function(
   data.stations.n.df <- data.stations.n.df %>%
     mutate(tasks = purrr::map2(
       as.character(mtime),
-      data_as_df,
+      data.df,
       mlr::makeRegrTask,
       target = target.chr
     )
@@ -67,7 +67,7 @@ make.benchmark.tasks <- function(
   
   # removing the tasks columns and only keeping the filtered tasks
   data.stations.n.df <- data.stations.n.df %>%
-    dplyr::select(mtime, data_as_df, tasks, filtered_tasks)
+    dplyr::select(mtime, data.df, tasks, filtered_tasks)
   
   # Define tasks on the 25% best tasks only
   data.stations.n.df$filtered_tasks <-  purrr::map(
