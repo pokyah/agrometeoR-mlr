@@ -381,7 +381,7 @@ get.points.cover_pct.fun <- function(
   colnames(cover_rate.points.df) <- gsub(" ","_",colnames(cover_rate.points.df))
 
   # merge cover data with points.1000.pt.sf
-  cover_rate.points.sf = merge(points.1000.pt.sf, cover_rate.points.df, by = "sid")
+  cover_rate.points.sf = merge(grid.1000.pt.sf, cover_rate.points.df, by = "sid")
 
   # only keep relevant columns
   cover_rate.points.sf <- cover_rate.points.sf %>%
