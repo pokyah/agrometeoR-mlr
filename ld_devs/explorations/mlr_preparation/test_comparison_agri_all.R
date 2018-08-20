@@ -34,8 +34,6 @@ dssf.pred.l <- lapply(dates, build.dssf.hour, dssf.nested.df = dssf.n.df, grid.p
 
 expl.static.grid.l <- lapply(dssf.pred.l, function(X){expl.static.grid.df$ens <- X$ens.pred})
 
-expl.static.grid.df$ens <- dssf.pred.df$ens.pred
-
 
 
 intpol.tsa.l <- lapply(dates, expl.static.grid.l, FUN = function(X,Y){

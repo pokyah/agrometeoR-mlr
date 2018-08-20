@@ -235,14 +235,14 @@ plotBMRRanksAsBarChart(bmrs.l, pretty.names = F, measure = rmse, pos = "dodge") 
 # bmrs.l <- c(bmr.Long_Lat.l, bmr.Long_Lat_Elev.l, bmr.SolarIrr_1bestVar.l, bmr.SolarIrr_2bestsVar.l,
 #             bmr.SolarIrr_3bestsVar.l, bmr.2bestsVar.l, bmr.3bestsVar.l, bmr.4bestsVar.l, bmr.Vars.r05.l, bmr.Vars.r03.l)
 # perfs.methods.l <- lapply(bmrs.l, getBMRAggrPerformances, as.df = TRUE)
-perfs.methods.Long_Lat.df <- getBMRAggrPerformances(bmr.Long_Lat.l,as.df = TRUE)
-perfs.methods.Long_Lat_Elev.df <- getBMRAggrPerformances(bmr.Long_Lat_Elev.l,as.df = TRUE)
-perfs.methods.SolarIrr_1bestVar.df <- getBMRAggrPerformances(bmr.SolarIrr_1bestVar.l,as.df = TRUE)
-perfs.methods.SolarIrr_2bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_2bestsVar.l,as.df = TRUE)
-perfs.methods.SolarIrr_3bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_3bestsVar.l,as.df = TRUE)
-perfs.methods.2bestsVar.df <- getBMRAggrPerformances(bmr.2bestsVar.l,as.df = TRUE)
-perfs.methods.3bestsVar.df <- getBMRAggrPerformances(bmr.3bestsVar.l,as.df = TRUE)
-perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.l,as.df = TRUE)
+perfs.methods.Long_Lat.df <- getBMRAggrPerformances(bmr.Long_Lat.p.l,as.df = TRUE)
+perfs.methods.Long_Lat_Elev.df <- getBMRAggrPerformances(bmr.Long_Lat_Elev.p.l,as.df = TRUE)
+perfs.methods.SolarIrr_1bestVar.df <- getBMRAggrPerformances(bmr.SolarIrr_1bestVar.p.l,as.df = TRUE)
+perfs.methods.SolarIrr_2bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_2bestsVar.p.l,as.df = TRUE)
+perfs.methods.SolarIrr_3bestsVar.df <- getBMRAggrPerformances(bmr.SolarIrr_3bestsVar.p.l,as.df = TRUE)
+perfs.methods.2bestsVar.df <- getBMRAggrPerformances(bmr.2bestsVar.p.l,as.df = TRUE)
+perfs.methods.3bestsVar.df <- getBMRAggrPerformances(bmr.3bestsVar.p.l,as.df = TRUE)
+perfs.methods.4bestsVar.df <- getBMRAggrPerformances(bmr.4bestsVar.p.l,as.df = TRUE)
 perfs.methods.Vars.r05.df <- getBMRAggrPerformances(bmr.Vars.r05.l,as.df = TRUE)
 perfs.methods.Vars.r03.df <- getBMRAggrPerformances(bmr.Vars.r03.l,as.df = TRUE)
 
@@ -331,7 +331,7 @@ dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-05-02 14:00:00", grid.1000.pt.s
 # add ens variable to prediction grid
 expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 # spatialize temperature on the grid
-interpolated.tsa.sf <- spatialize(regr.lrn = lrns.l[[4]],
+interpolated.tsa.sf <- spatialize(regr.lrn = lrns.l[[2]],
                             task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
                             prediction_grid.df = expl.static.grid.df,
                             predict.type = "se"
@@ -366,3 +366,5 @@ ggmap <- build.static.ggmap(gridded.data.df = interpolated.tsa.df,
                             resolution.chr = "Resolution : 1 km²")
 ggmap
 
+
+# use gridExtra's function grid.arrange to display several maps in one plot
