@@ -13,7 +13,8 @@ library(jsonlite)
 library(RColorBrewer)
 
 # getting and preparing tsa and ens records from AGROMET API
-records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json") # available on FTP
+records.l <- jsonlite::fromJSON(
+  "~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json") # available on FTP
 records.df <- records.l$results
 stations_meta.df <- records.l$references$stations
 records_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = records.df)
@@ -345,13 +346,13 @@ boundaries.sf <- st_as_sf(boundaries.sp)
 st_crs(boundaries.sf) <- lambert2008.crs
 
 # prepare data to be visualized (transform from points to grid and then storing them in a df)
-intpol.tsa.sp <- as(interpolated.tsa.sf, "Spatial") %>%
+interpolated.tsa.sp <- as(interpolated.tsa.sf, "Spatial") %>%
   as(., "SpatialPixelsDataFrame") %>%
   as(., "SpatialGridDataFrame")
-intpol.tsa.df<- as.data.frame(intpol.tsa.sp)
+interpolated.tsa.df<- as.data.frame(interpolated.tsa.sp)
 
 # build the map
-ggmap <- build.static.ggmap(gridded.data.df = intpol.tsa.df,
+ggmap <- build.static.ggmap(gridded.data.df = interpolated.tsa.df,
                             boundaries.sf = boundaries.sf,
                             layer.error.bool = T,
                             legend.error.bool = F,

@@ -26,6 +26,7 @@ records.stations.df <- records.stations.df %>% dplyr::select(-tsa)
 stations_meta.sf <- st_as_sf(stations_meta.df, coords = c("longitude", "latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs")
 
 # filter with nearest points from stations
+# sid found by manual check
 dssf.151111_151231.df <- dssf.151111_151231.df %>%
   filter(sid %in% c(875, 840, 838, 756, 746, 705, 711, 644, 624, 580,
                     552, 476, 465, 499, 396, 443, 307, 378, 330, 259,
@@ -65,18 +66,19 @@ dssf.180101_180630.df <- dssf.180101_180630.df %>%
 # dssf.sid.sf <- dssf.sid.sf[!duplicated(dssf.sid.sf),]
 # mapview(dssf.sid.sf) + stations_meta.sf
 
-
+# aggregate records
 dssf.records.df <- bind_rows(dssf.151111_151231.df, dssf.160101_160630.df) %>%
   bind_rows(., dssf.160701_161231.df) %>%
   bind_rows(., dssf.170101_170630.df) %>%
   bind_rows(., dssf.170701_171231.df) %>%
   bind_rows(., dssf.180101_180630.df)
 
-
+# checking number of records to be equal to number of stations
 table.stations.df <- as.data.frame(table(records.stations.df$mtime))
 table.stations.df <- table.stations.df[table.stations.df$Freq == 29,]
 table.dssf.df <- table(dssf.records.df$mhour)
 
+# reducing a little the period to compare to avoid NA values
 dssf.records.df <- dssf.records.df %>%
   filter(mhour >= "2016-01-01 00:00:00" & mhour <= "2018-06-01 00:00:00") %>%
   filter(mhour != "2017-12-31" & mhour != "2017-06-30") %>%
@@ -85,10 +87,11 @@ records.stations.df <- records.stations.df %>%
   filter(mtime >= "2016-01-01 00:00:00" & mtime <= "2018-06-01 00:00:00") %>%
   filter(mtime %in% dssf.records.df$mhour)
 
+# ordering sid from dssf pixels to correspond to order of stations
 order <- c(756, 840, 838, 711, 705, 644, 443, 476, 624, 58, 307, 552, 499, 396, 
            254, 247, 875, 132, 259, 77, 239, 378, 465, 154, 62, 180, 746, 330, 580)
 dssf.records.df <- dssf.records.df[match(order, dssf.records.df$sid),]
-# couple correlation
+# computing correlations between couple of sid
 cor(dssf.records.df$ens, records.stations.df$ens, use = "na.or.complete")
 correlations.df <- data.frame(couple.id_station.id_pix = c('25/396', '23/552', '24/499', '42/330', '14/443', '35/378', '33/77',
                                          '30/132', '32/259', '26/254', '39/62', '18/58', '40/180', '27/247',
