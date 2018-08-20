@@ -12,8 +12,8 @@ library(plotly)
 library(jsonlite)
 library(RColorBrewer)
 
-# get tsa and ens records from AGROMET API
-records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json")
+# getting and preparing tsa and ens records from AGROMET API
+records.l <- jsonlite::fromJSON("~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json") # available on FTP
 records.df <- records.l$results
 stations_meta.df <- records.l$references$stations
 records_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = records.df)
@@ -44,27 +44,37 @@ lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 
 records.stations.sf <- st_transform(records.stations.sf, crs = lambert2008.crs)
 records.stations.sf <- dplyr::bind_cols(records.stations.sf, data.frame(sf::st_coordinates(records.stations.sf)))
 
-# Make tasks
+# Make tasks and filtered tasks
 data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf,
                                            dynamic.vars = records.stations.sf,
                                            target.chr = "tsa",
                                            feat_to_drop.chr = NULL,
                                            filter_method.chr = "linear.correlation",
-                                           filter_abs.num = 2,
-                                           mandatory.feat.chr = NULL)
+                                           filter_abs.num = 2, # number of best variables to keep according to filter method score
+                                           mandatory.feat.chr = NULL) # variable forced as explanatory variable for filtered tasks
 
-# defining the learner
+# defining the learners
 # lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
-lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat", predict.type = "se"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y"), fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev", predict.type = "se"), fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y", "altitude"), fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar", predict.type = "se"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar", predict.type = "se"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar", predict.type = "se"), fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar", predict.type = "se"), fw.method = "linear.correlation", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar", predict.type = "se"), fw.method = "linear.correlation", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar", predict.type = "se"), fw.method = "linear.correlation", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5", predict.type = "se"), fw.method = "linear.correlation", fw.threshold = 0.5),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3", predict.type = "se"), fw.method = "linear.correlation", fw.threshold = 0.3))
+lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat", predict.type = "se"),
+                                 fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y"), fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y", "altitude"), fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar", predict.type = "se"), 
+                                 fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar", predict.type = "se"), 
+                                 fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.abs = 3),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.abs = 4),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.threshold = 0.5),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3", predict.type = "se"), 
+                                 fw.method = "linear.correlation", fw.threshold = 0.3))
 
 
 # defining the validation (resampling) strategy
@@ -205,15 +215,19 @@ bmr.Vars.r03.l <- benchmark(
 save("bmr.Vars.r03.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr.Vars.r03.l.rda")
 rm("bmr.Vars.r03.l")
 
-# merge beanchmark results, hard to merge more than 5 benchmark results !
-bmrs.l <- mergeBenchmarkResults(list(bmr.Long_Lat_Elev.p.l, bmr.SolarIrr_2bestsVar.p.l, bmr.2bestsVar.p.l))
+# merge benchmark results, hard to merge more than 5 benchmark results !
+bmrs.l <- mergeBenchmarkResults(list(bmr.Long_Lat_Elev.p.l, 
+                                     bmr.SolarIrr_2bestsVar.p.l, 
+                                     bmr.2bestsVar.p.l,
+                                     bmr.3bestsVar.p.l,
+                                     bmr.SolarIrr_1bestVar.p.l))
 
 # plotBMRSummary(bmrs.l, measure = rmse, pointsize = 0.01, pretty.names = F) # 23089 tasks -> unreadable
-# barchart displaying the number of times where each methods has rank 1 to 3 to compare performances
-plotBMRRanksAsBarChart(bmrs.l, pos = "dodge", pretty.names = F) +
+# barchart displaying the number of times where each methods has rank 1 to -nb learners- to compare performances
+plotBMRRanksAsBarChart(bmrs.l, pretty.names = F, measure = rmse, pos = "dodge") +
   ggtitle("Comparison of methods by their ranks") +
-  scale_y_continuous(breaks = seq(0,14000,by = 2000), limits = c(0, 14000)) +
-  scale_fill_discrete(labels = c("lm.2bestsVar", "lm.Long.Lat.Elev", "lm.SolarIrr+2bestsVar"), name = "Method") +
+  scale_y_continuous(breaks = seq(0,12000,by = 2000), limits = c(0, 12000)) +
+  scale_fill_discrete(labels = c("lm.2bestsVar", "lm.3bestsVar", "lm.Long.Lat.Elev", "lm.SolarIrr+1bestVar", "lm.SolarIrr+2bestsVar"), name = "Method") +
   labs(x = "Rank", y = "Number of times")
 
 # computing performances of the benchmark
@@ -263,7 +277,7 @@ data.stations.n.df <- data.stations.n.df %>%
   mutate(regr.model = purrr::map(
     tasks,
     train,
-    learner = lrns.l[[6]]
+    learner = lrns.l[[4]]
   ))
 data.stations.n.df <- data.stations.n.df %>%
   mutate(get.model = purrr::map(
@@ -305,23 +319,24 @@ grid.1000.pt.sp <- build.vs.grid.fun(
 
 # get ens on virtual grid
 # load dssf records from the period you want
+# data prepared from geojson available on FTP, see prepare_dssf_2y.R in explorations/solar_irradiance
+# one file for each period of 6 months named dssf.yymmdd_yymmdd.df
 load("./data/dssf.180101_180630.df.rda")
 dssf.n.df <- dssf.180101_180630.df %>%
   group_by(mhour) %>%
   nest()
-# spatialize dssf for the hour you want
+# spatialize dssf for the hour you want, function in explorations/solar_irradiance/R
 dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-05-02 14:00:00", grid.1000.pt.sp)
 # add ens variable to prediction grid
 expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 # spatialize temperature on the grid
-intpol.tsa.sf <- spatialize(regr.lrn = lrns.l[[6]],
+interpolated.tsa.sf <- spatialize(regr.lrn = lrns.l[[4]],
                             task = data.stations.n.df$tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
                             prediction_grid.df = expl.static.grid.df,
                             predict.type = "se"
                             ) %>%
   dplyr::select(gid, geometry, response, se)
 
-## visualize the map
 # get Wallonia boundaries
 boundaries.sp <- raster::getData('GADM', country="BE", level=1, path = "./external-data/Boundaries") %>%
   subset(NAME_1 == "Wallonie")
@@ -330,7 +345,7 @@ boundaries.sf <- st_as_sf(boundaries.sp)
 st_crs(boundaries.sf) <- lambert2008.crs
 
 # prepare data to be visualized (transform from points to grid and then storing them in a df)
-intpol.tsa.sp <- as(intpol.tsa.sf, "Spatial") %>%
+intpol.tsa.sp <- as(interpolated.tsa.sf, "Spatial") %>%
   as(., "SpatialPixelsDataFrame") %>%
   as(., "SpatialGridDataFrame")
 intpol.tsa.df<- as.data.frame(intpol.tsa.sp)
@@ -349,5 +364,4 @@ ggmap <- build.static.ggmap(gridded.data.df = intpol.tsa.df,
                             reverse_pal.bool = T,
                             resolution.chr = "Resolution : 1 km²")
 ggmap
-
 
