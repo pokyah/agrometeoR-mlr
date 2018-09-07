@@ -8,7 +8,16 @@
 #' @param filter_abs.num A numeric which specifies how many top scoring features you want to select
 #' @return a nested dataframe with data and tasks for every hour
 #' @export
-make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_drop.chr, filter_method.chr, filter_abs.num){
+make.benchmark.tasks <- function(
+  static.vars,
+  dynamic.vars,
+  target.chr,
+  feat_to_drop.chr,
+  filter_method.chr,
+  filter_abs.num = NULL,
+  filter_thr.num = NULL,
+  mandatory.feat.chr = NULL
+  ){
   
   data.sf <- st_join(static.vars, dynamic.vars)
   
@@ -26,14 +35,14 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
   # converting each tibble of the nested records to a strict dataframe (required by mlr)
   # ::todo:: need to use transmute_at
   data.stations.n.df <- data.stations.n.df %>%
-    mutate(data_as_df = purrr::map(
+    mutate(data.df = purrr::map(
       .x = data,
       .f = data.frame
     ))
   
   # removing the tibbles columns and only keeping the pure dataframes (required by mlr)
   data.stations.n.df <- data.stations.n.df %>%
-    dplyr::select(mtime, data_as_df)
+    dplyr::select(mtime, data.df)
   
   # defining the regression tasks on the stations observations for each of the hourly datasets
   # https://stackoverflow.com/questions/46868706/failed-to-use-map2-with-mutate-with-purrr-and-dplyr
@@ -41,7 +50,7 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
   data.stations.n.df <- data.stations.n.df %>%
     mutate(tasks = purrr::map2(
       as.character(mtime),
-      data_as_df,
+      data.df,
       mlr::makeRegrTask,
       target = target.chr
     )
@@ -49,7 +58,7 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
   
   # drop unexplanatory features
   data.stations.n.df <- data.stations.n.df %>%
-    mutate(filtered_tasks = map(
+    mutate(filtered_tasks = purrr::map(
       .x = tasks,
       .f = mlr::dropFeatures,
       features = feat_to_drop.chr
@@ -58,14 +67,16 @@ make.benchmark.tasks <- function(static.vars, dynamic.vars, target.chr, feat_to_
   
   # removing the tasks columns and only keeping the filtered tasks
   data.stations.n.df <- data.stations.n.df %>%
-    dplyr::select(mtime, data_as_df, filtered_tasks)
+    dplyr::select(mtime, data.df, tasks, filtered_tasks)
   
   # Define tasks on the 25% best tasks only
   data.stations.n.df$filtered_tasks <-  purrr::map(
     data.stations.n.df$filtered_tasks,
     mlr::filterFeatures,
     method = filter_method.chr,
-    abs = filter_abs.num
+    abs = filter_abs.num,
+    threshold = filter_thr.num,
+    mandatory.feat = mandatory.feat.chr
   )
   
   return(data.stations.n.df)

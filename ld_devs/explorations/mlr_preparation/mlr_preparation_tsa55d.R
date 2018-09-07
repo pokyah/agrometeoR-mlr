@@ -1,10 +1,13 @@
 source("./R/file_management.R")
-source_files_recursively.fun("./R")
+# source_files_recursively.fun("./R")
 source_files_recursively.fun("./ld_devs/explorations/mlr_preparation/R")
+source_files_recursively.fun("./ld_devs/explorations/solar_irradiance/R")
 
+library(geoTools)
 library(tidyverse)
 library(sf)
 library(mlr)
+library(plotly)
 
 # Retrieving from API
 records.stations.df <- prepare_agromet_API_data.fun(
@@ -36,14 +39,15 @@ expl.static.stations.sf <- expl.static.stations.sf %>%
 
 # Selecting only the useful features
 records.stations.df <- records.stations.df %>%
-  dplyr::select("mtime", "sid", "tsa" ,"ens", "longitude", "latitude")
+  dplyr::select("mtime", "sid", "ens", "longitude", "latitude", "tsa")
 colnames(records.stations.df)[2] <- "gid"
 
 # Preparing for spatial join of dynamic and static expl vars
 records.stations.sf <- st_as_sf(records.stations.df, coords = c("longitude", "latitude"))
 st_crs(records.stations.sf) <- "+proj=longlat +datum=WGS84 +no_defs"
-lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+lambert2008.crs <- "+proj=lcc +lat_1=49.83333333333334 +lat_2=51.16666666666666 +lat_0=50.797815 +lon_0=4.359215833333333 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
 records.stations.sf <- st_transform(records.stations.sf, crs = lambert2008.crs)
+records.stations.sf <- dplyr::bind_cols(records.stations.sf, data.frame(sf::st_coordinates(records.stations.sf)))
 
 # Make tasks
 data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf,
@@ -53,10 +57,34 @@ data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf
                                            filter_method.chr = "linear.correlation",
                                            filter_abs.num = 2)
 
+data.stations.n.df <- data.stations.n.df %>%
+  mutate(ens.herb.task = purrr::map2(
+    paste0(as.character(mtime),"-ens.herb"),
+    data_as_df,
+    mlr::makeRegrTask,
+    target = "tsa"
+  ))
+data.stations.n.df$alt.task <- purrr::map(data.stations.n.df$alt.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "herbaceous", "X", "Y", "ens"))
+data.stations.n.df$ens.task <- purrr::map(data.stations.n.df$ens.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "herbaceous", "X", "Y", "altitude"))
+data.stations.n.df$alt.ens.task <- purrr::map(data.stations.n.df$alt.ens.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$crops.task <- purrr::map(data.stations.n.df$crops.task, dropFeatures, features = c("slope", "aspect", "roughness", "ens", "altitude", "artificial", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$herb.task <- purrr::map(data.stations.n.df$herb.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "artificial", "forest", "ens", "altitude", "X", "Y"))
+data.stations.n.df$artif.task <- purrr::map(data.stations.n.df$artif.task, dropFeatures, features = c("slope", "aspect", "roughness", "crops", "altitude", "ens", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$ens.crops.task <- purrr::map(data.stations.n.df$ens.crops.task, dropFeatures, features = c("slope", "aspect", "roughness", "altitude", "artificial", "forest", "herbaceous", "X", "Y"))
+data.stations.n.df$ens.herb.task <- purrr::map(data.stations.n.df$ens.herb.task, dropFeatures, features = c("slope", "aspect", "roughness", "altitude", "artificial", "forest", "crops", "X", "Y"))
+data.stations.n.df$ens.alt.crops.task <- purrr::map(data.stations.n.df$ens.alt.crops.task, dropFeatures, features = c("slope", "aspect", "roughness", "artificial", "forest", "herbaceous", "X", "Y"))
+
+
 # defining the learner
 # lrn <- list(makeFilterWrapper(makeLearner(cl = "regr.lm", id="linear regression"),
 #                               fw.method = "linear.correlation", threshold = 0.25))
 lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
+
+lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt"), fw.method = "linear.correlation", fw.mandatory.feat = "altitude", fw.abs = 1),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens"), fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 1),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.alt.ens"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "altitude"), fw.abs = 2),
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.ens.herb"), fw.method = "linear.correlation", fw.mandatory.feat = c("ens", "herbaceous"), fw.abs = 2))
+
 
 # defining the validation (resampling) strategy
 resampling.l = mlr::makeResampleDesc(
@@ -76,38 +104,96 @@ resampling.l = mlr::makeResampleDesc(
 
 bmr.l <- benchmark(
   learners = lrn,
-  tasks = data.stations.n.df$filtered_tasks,
+    tasks = data.stations.n.df$filtered_tasks,
+    # list(data.stations.n.df$alt.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #      data.stations.n.df$ens.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$alt.ens.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$crops.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$herb.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$artif.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$ens.crops.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$ens.herb.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]],
+    #          data.stations.n.df$ens.alt.crops.task[[which(data.stations.n.df$mtime=="2018-04-22 09:00:00")]]),
   resamplings = resampling.l,
-  keep.pred = TRUE,
+  keep.pred = T,
   show.info = FALSE,
   models = FALSE,
-  measures = list(mse, timetrain)
+  measures = list(rmse, timetrain)
 )
 
-# # computing performances of the benchmark
-# perfs.methods.df <- getBMRAggrPerformances(bmr.l,as.df = TRUE)
-# # mean mse.test.mean : 1.679534
-# # predicting temperature
+# plotBMRBoxplots(bmr.w.l, measure = rmse, pretty.names = F)
+plotBMRRanksAsBarChart(bmr.w.l, pretty.names = F)
+# mlr::plotLearnerPrediction(learner = lrn[[1]],
+                           # task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime=="2018-04-10 11:00:00")]])
+ggplotly(plotBMRSummary(bmr.w.l, measure = rmse, pointsize = 1, pretty.names = F))
+
+# bmr.comp.l <- mergeBenchmarkResults(list(bmr.ens.l, bmr.alt.ens.l))
+
+# computing performances of the benchmark
+perfs.methods.df <- getBMRAggrPerformances(bmr.w.l,as.df = TRUE)
+perfs.mean.df <- data.frame(rmse.mean = c(mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.alt.filtered"]),
+                                          mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.ens.filtered"]),
+                                          mean(perfs.methods.df$rmse.test.rmse[perfs.methods.df$learner.id=="lm.alt.ens.filtered"]),
+                                          mean(perfs.methods.df$rmse.test.rmse)),
+                            method = c("lm.alt", "lm.ens", "lm.alt.ens", "mean"))
+# predicting temperature
 # tsa.predict.df <- getBMRPredictions(bmr.l, as.df = TRUE)
 
 # get coefficents from regression model equation
 data.stations.n.df <- data.stations.n.df %>%
-  mutate(regr.model = map(
+  mutate(regr.model = purrr::map(
     filtered_tasks,
     train,
     learner = lrn[[1]]
   ))
 data.stations.n.df <- data.stations.n.df %>%
-  mutate(get.model = map(
+  mutate(get.model = purrr::map(
     regr.model,
     getLearnerModel
   ))
 
+models.df <- as.data.frame(data.stations.n.df$mtime)
+colnames(models.df)[colnames(models.df) == 'data.stations.n.df$mtime'] <- 'Datetime'
+for(i in 1:nrow(models.df)){
+  models.df$Equation[i] <- paste0("T = ", round(data.stations.n.df$get.model[[i]][['coefficients']][['(Intercept)']], digits = 4),
+                             " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[2]], digits = 4),
+                             ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[2]],
+                             " + ", round(data.stations.n.df$get.model[[i]][['coefficients']][[3]], digits = 4),
+                             ".", names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
+                             )
+  models.df$Residual_SE[i] <- round(as.numeric(summary(data.stations.n.df$get.model[[i]])[['sigma']]), digits = 2)
+  models.df$Var1[i] <- names(data.stations.n.df$get.model[[i]][['coefficients']])[[2]]
+  models.df$Var2[i] <- names(data.stations.n.df$get.model[[i]][['coefficients']])[[3]]
+}
+models.df$Residual_SE <- as.numeric(models.df$Residual_SE)
+ggplot(models.df, aes(x = Datetime, y = Residual_SE)) +
+  # geom_point() +
+  geom_line() +
+  scale_y_continuous(breaks = round(seq(0,3, by = 0.2),1), limits = c(0,3)) +
+  scale_x_datetime(date_breaks = "5 days")
+
 # spatialize prediction and error on the grid of Wallonia
-load("./data/expl.static.grid.df.rda")
+load("./data/expl.static.grid.df.rda") # be careful it is a sf but it is more efficient (::todo:: modify generate independent variables)
+# expl.static.grid.df <- data.frame(dplyr::bind_cols(expl.static.grid.df, data.frame(sf::st_coordinates(expl.static.grid.df))))
+grid.1000.pt.sp <- build.vs.grid.fun(
+  res.num = 1000,
+  geom.chr = "centers",
+  sf.bool = F,
+  EPSG.chr = "3812",
+  country_code.chr = "BE",
+  NAME_1.chr = "Wallonie"
+)
+load("./data/dssf.0103_3105.df.rda")
+# get ens on virtual grid
+dssf.n.df <- dssf.0103_3105.df %>%
+  group_by(mhour) %>%
+  nest()
+dssf.pred.df <- build.dssf.hour(dssf.n.df, "2018-05-02 14:00:00", grid.1000.pt.sp)
+# add ens variable to prediction grid
+expl.static.grid.df$ens <- dssf.pred.df$ens.pred
 spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
                                  learner.id.chr = "linear regression",
-                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-01 17:00:00')]],
+                                 task = data.stations.n.df$filtered_tasks[[which(data.stations.n.df$mtime == '2018-05-02 14:00:00')]],
                                  prediction_grid.df = expl.static.grid.df,
                                  predict.type = "se"
                                  ) %>%
@@ -122,38 +208,35 @@ spatialized.tsa_error.sf <- spatialize(learner.cl.chr = "regr.lm",
 #   country_code.chr = "BE",
 #   NAME_1.chr = "Wallonie"
 # )
-spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_error.sf = spatialized.tsa_error.sf,
-                                                            grid.pg.sf = grid.1000.pg.sf,
-                                                            sf.bool = TRUE)
+# spatialized.tsa_error.pg.sf <- build.spatialized.tsa_error.pg(spatialized.tsa_error.sf = spatialized.tsa_error.sf,
+#                                                             grid.pg.sf = grid.1000.pg.sf,
+#                                                             sf.bool = TRUE)
 
 # visualize the map
-# function needs a sf made of points if you do not want to visualize error
-# but needs a sf made of polygons if you want to
-map <- create_map_tsa(spatial_data.sf = spatialized.tsa_error.pg.sf,
-                      method.chr = "lm",
-                      date.chr = "2018-05-02 14:00:00",
-                      type.chr = "interactive",
-                      country_code.chr = "BE",
-                      NAME_1.chr = "Wallonie",
-                      error.bool = TRUE,
-                      error_layer.bool = TRUE,
-                      alpha_error.num = NULL)
-map
+# get Wallonia boundaries
+boundaries.sp <- raster::getData('GADM', country="BE", level=1, path = "./external-data/Boundaries") %>%
+  subset(NAME_1 == "Wallonie")
+boundaries.sp <- spTransform(boundaries.sp, CRSobj = lambert2008.crs)
+boundaries.sf <- st_as_sf(boundaries.sp)
+st_crs(boundaries.sf) <- lambert2008.crs
 
+# prepare data to be visualized (transform from points to polygons and then storing them in a df)
+spatialized.tsa_error.sp <- as(spatialized.tsa_error.sf, "Spatial") %>%
+  as(., "SpatialPixelsDataFrame") %>%
+  as(., "SpatialGridDataFrame")
+spatialized.tsa_error.df <- as.data.frame(spatialized.tsa_error.sp)
 
-
-
-
-
-prediction_tsa.map <- make.map.tsa_prediction.fun(spatial.data.sf = spatialized.tsa_error.sf,
-                                                  type.chr = "interactive",
-                                                  method.chr = "lm",
-                                                  date.chr = "2018-05-02 14:00:00",
-                                                  country_code.chr = "BE",
-                                                  NAME_1.chr = "Wallonie",
-                                                  overlay.bool = T)
-prediction_tsa.map
-
+ggmap <- build.static.ggmap(gridded.data.df =spatialized.tsa_error.df,
+             boundaries.sf = boundaries.sf,
+             layer.error.bool = T,
+             legend.error.bool = F,
+             pretty_breaks.bool = T,
+             title.chr = "Interpolated temperature with multiple linear regression - 2018-05-02 14:00:00",
+             target.chr = "response",
+             legend.chr = "test",
+             nb_classes.num = 10,
+             reverse_pal.bool = TRUE)
+ggmap
 
 ### Investigation clc
 
@@ -189,6 +272,36 @@ map_comparison <- create_map_tsa.comparison_clc(spatial_data.sf = spatialized.ts
 map_comparison
 
 
+### test comparison ens stations and ens eumetsat
+
+comparison.ens.sf <- st_intersection(st_buffer(st_as_sf(expl.static.grid.df,
+                                                        coords = c("X", "Y"),
+                                                        crs = lambert2008.crs), dist = 500),
+                                     records.stations.sf) %>%
+  dplyr::filter(mtime == "2018-05-02 14:00:00")
+
+dssf.0103_3105.l.df <- dssf.0103_3105.df %>%
+  st_as_sf(., coords = c("long", "lat"), crs = "+proj=longlat +datum=WGS84 +no_defs") %>%
+  st_transform(., crs = lambert2008.crs)
+dssf.0103_3105.l.df <- dplyr::bind_cols(dssf.0103_3105.l.df, data.frame(sf::st_coordinates(dssf.0103_3105.l.df)))
+
+dssf.n.l.df <- dssf.0103_3105.l.df %>%
+  group_by(mhour) %>%
+  nest()
+
+dssf.red.n.df <- dssf.n.l.df %>%
+  filter(mhour >= "2018-04-01 00:00:00" & mhour <= "2018-05-25 00:00:00")
+
+data_ens.df <- left_join(dssf.red.n.df, data.stations.n.df, by = c("mhour" = "mtime")) %>%
+  dplyr::select(mhour, data, data_as_df)
+
+data_ens.df <- data_ens.df %>%
+  mutate(comparison_ens = purrr::map2(
+    data,
+    data_as_df,
+    left_join,
+    by = c("X", "Y")
+  ))
 
 
 
