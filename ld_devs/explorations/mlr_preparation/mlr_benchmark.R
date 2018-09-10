@@ -13,8 +13,7 @@ library(jsonlite)
 library(RColorBrewer)
 
 # getting and preparing tsa and ens records from AGROMET API
-records.l <- jsonlite::fromJSON(
-  "~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json") # available on FTP
+records.l <- jsonlite::fromJSON(txt = readLines( "~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30")) # available on FTP
 records.df <- records.l$results
 stations_meta.df <- records.l$references$stations
 records_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = records.df)
@@ -58,23 +57,23 @@ data.stations.n.df <- make.benchmark.tasks(static.vars = expl.static.stations.sf
 # lrn <- list(makeLearner(cl = "regr.lm", id = "linear regression"))
 lrns.l <- list(makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y"), fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Long.Lat.Elev", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.mandatory.feat = c("X", "Y", "altitude"), fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+1bestVar", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.mandatory.feat = "ens", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+2bestsVar", predict.type = "se"),
                                  fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.SolarIrr+3bestsVar", predict.type = "se"),
                                  fw.method = 'linear.correlation', fw.mandatory.feat = "ens", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.2bestsVar", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.abs = 2),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.3bestsVar", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.abs = 3),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.4bestsVar", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.abs = 4),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,5", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.threshold = 0.5),
-               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3", predict.type = "se"), 
+               makeFilterWrapper(learner = makeLearner(cl = "regr.lm", id = "lm.Vars.r>0,3", predict.type = "se"),
                                  fw.method = "linear.correlation", fw.threshold = 0.3))
 
 
@@ -217,8 +216,8 @@ save("bmr.Vars.r03.l", file = "~/Documents/code/agrometeoR-mlr/external-data/bmr
 rm("bmr.Vars.r03.l")
 
 # merge benchmark results, hard to merge more than 5 benchmark results !
-bmrs.l <- mergeBenchmarkResults(list(bmr.Long_Lat_Elev.p.l, 
-                                     bmr.SolarIrr_2bestsVar.p.l, 
+bmrs.l <- mergeBenchmarkResults(list(bmr.Long_Lat_Elev.p.l,
+                                     bmr.SolarIrr_2bestsVar.p.l,
                                      bmr.2bestsVar.p.l,
                                      bmr.3bestsVar.p.l,
                                      bmr.SolarIrr_1bestVar.p.l))
@@ -262,8 +261,8 @@ perfs.methods.aggr.mae.df <- perfs.methods.df %>%
   summarise(mae.mean = mean(mae.test.mean))
 perfs.methods.aggr.df <- left_join(perfs.methods.aggr.rmse.df, perfs.methods.aggr.mae.df, by = "learner.id")
 # make learner id more readable for the graph
-perfs.methods.aggr.df$learner.id <- substr(perfs.methods.aggr.df$learner.id, 
-                                           start = 1, 
+perfs.methods.aggr.df$learner.id <- substr(perfs.methods.aggr.df$learner.id,
+                                           start = 1,
                                            stop = nchar(as.character(perfs.methods.aggr.df$learner.id))-9)
 # visualize the performances
 ggplot(perfs.methods.aggr.df, aes(y = reorder(learner.id, -mae.mean, sum))) +
@@ -300,7 +299,7 @@ for(i in 1:nrow(models.df)){
   # explanatory variables used for the model
   models.df$BestVar1[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[2]]
   models.df$BestVar2[i] <- names(data.stations.n.df$get.model[[i]][['learner.model']][['coefficients']])[[3]]
-  
+
   # error associated to the model
   models.df$RMSE <- perfs.methods.2bestsVar.df$rmse.test.rmse
   models.df$MAE <- perfs.methods.2bestsVar.df$mae.test.mean
