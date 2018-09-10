@@ -12,24 +12,7 @@ library(plotly)
 library(jsonlite)
 library(RColorBrewer)
 
-# getting and preparing tsa and ens records from AGROMET API
-records.l <- jsonlite::fromJSON(txt = readLines( "~/Documents/code/agrometeor/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json")) # available on FTP
-records.df <- records.l$results
-stations_meta.df <- records.l$references$stations
-records_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = records.df)
-records.stations.df <- prepare_agromet_API_data.fun(records_and_stations_meta.l, "cleandata")
-# Filtering dynamic records to keep only the useful ones
-records.stations.df <- records.stations.df %>%
-  filter(network_name == "pameseb") %>%
-  filter(type_name != "Sencrop") %>%
-  filter(!is.na(to)) %>%
-  filter(state == "Ok") %>%
-  filter(!is.na(tsa)) %>%
-  filter(!is.na(ens))
-# Selecting only the useful features
-records.stations.df <- records.stations.df %>%
-  dplyr::select("mtime", "sid", "ens", "longitude", "latitude", "tsa")
-colnames(records.stations.df)[2] <- "gid"
+
 
 # get static variables
 load("./data/expl.static.stations.sf.rda")
