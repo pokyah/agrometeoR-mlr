@@ -1,6 +1,6 @@
 Package: AgrometeoR
 Type: Package
-Title: Collection of custom functions regularly used in my R developments, especially for the Agromet Project
+Title: Weather Spatialization algorithms benchmarking
 Version: 0.1.0
 Author: Thomas Goossens
 Maintainer: <hello.pokyah@gmail.com>
@@ -10,20 +10,25 @@ License: GNU GPL-V3
 Encoding: UTF-8
 LazyData: true
 Imports:
-	  raster (>= 2.6-7),
-    chron,
-    lubridate,
-    jsonlite,
-    httr,
-    leaflet,
-    sf,
-    htmlwidgets,
-    ggplot2,
-    mapview,
-    tmap,
+    agrometAPI,
     broom,
-    tidyr,
+	  chron,
+	  dplyr,
+	  geoTools,
+	  ggplot2,
+	  htmlwidgets,
+	  httr,
+	  raster (>= 2.6-7),
+    jsonlite,
+    leaflet,
+    lubridate,
+    mapview,
+    mlr,
     reshape2,
-    magrittr,
-    dplyr
+    sf,
+    tidyr
+Remotes : github::pokyah/agrometAPI,
+    github::pokyah/geoTools,
+    github::tidyverse/ggplot2
+    github::pokyah/mlr@gstat_subfunctions
 RoxygenNote: 6.0.1
