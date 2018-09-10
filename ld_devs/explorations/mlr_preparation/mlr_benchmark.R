@@ -13,7 +13,7 @@ library(jsonlite)
 library(RColorBrewer)
 
 # getting and preparing tsa and ens records from AGROMET API
-records.l <- jsonlite::fromJSON(txt = readLines( "~/Documents/code/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30")) # available on FTP
+records.l <- jsonlite::fromJSON(txt = readLines( "~/Documents/code/agrometeor/agrometeoR-mlr/data/cleandataSensorstsa-ensForallFm2015-11-11To2018-06-30.json")) # available on FTP
 records.df <- records.l$results
 stations_meta.df <- records.l$references$stations
 records_and_stations_meta.l <- list(stations_meta.df = stations_meta.df, records.df = records.df)
